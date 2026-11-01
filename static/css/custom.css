@@ -1,0 +1,169 @@
+/* =========================================================================
+   BICTDA LMS - custom styles (works together with Tailwind CSS)
+   Colours: deep royal blue (#0a1a4f -> #2546e0) + emerald (#059669 -> #34d399)
+   ========================================================================= */
+
+html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
+body { font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+/* ---------- Hero background: gradients + hexagon tech pattern + dot grid ---------- */
+.bictda-hero-bg {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #081233;
+  background-image:
+    radial-gradient(55rem 38rem at 8% -12%, rgba(16, 185, 129, 0.38), transparent 60%),
+    radial-gradient(48rem 34rem at 108% 6%, rgba(59, 99, 243, 0.50), transparent 62%),
+    radial-gradient(42rem 30rem at 50% 118%, rgba(5, 150, 105, 0.32), transparent 62%),
+    linear-gradient(135deg, #0a1a4f 0%, #0b2569 46%, #06483a 100%);
+}
+.bictda-hero-bg::before {          /* hexagon pattern */
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100' viewBox='0 0 56 100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34L28 66zm0 0v34' fill='none' stroke='%23ffffff' stroke-opacity='0.07' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 56px 100px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 85%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 85%);
+  pointer-events: none;
+}
+.bictda-hero-bg::after {           /* glowing dot grid + circuit lines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    radial-gradient(rgba(167, 243, 208, 0.18) 1px, transparent 1.2px),
+    linear-gradient(90deg, transparent 49.5%, rgba(96, 139, 250, 0.10) 50%, transparent 50.5%),
+    linear-gradient(0deg, transparent 49.5%, rgba(52, 211, 153, 0.08) 50%, transparent 50.5%);
+  background-size: 24px 24px, 240px 240px, 240px 240px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 75%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 75%);
+  pointer-events: none;
+}
+
+/* Soft glowing orbs used on the landing page */
+.orb {
+  position: absolute;
+  z-index: -1;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.55;
+  animation: orb-float 14s ease-in-out infinite;
+}
+@keyframes orb-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(20px, -24px, 0) scale(1.06); }
+}
+
+/* ---------- Glassmorphism ---------- */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 24px 60px -24px rgba(2, 6, 23, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+.glass-strong {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.70);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: 0 30px 80px -30px rgba(2, 6, 23, 0.70);
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, #93b4ff 0%, #6ee7b7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- App (dashboard) background ---------- */
+.app-bg {
+  background-color: #f4f7fb;
+  background-image: radial-gradient(#dfe6f2 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar-bg {
+  background: linear-gradient(180deg, #0a1a4f 0%, #0c2263 55%, #053d31 100%);
+}
+.sidebar-pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100' viewBox='0 0 56 100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34L28 66zm0 0v34' fill='none' stroke='%23ffffff' stroke-opacity='0.05' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 56px 100px;
+}
+.nav-link.active {
+  position: relative;
+  color: #fff;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.nav-link.active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: 0 6px 6px 0;
+  background: linear-gradient(180deg, #34d399, #608bfa);
+}
+
+/* Desktop: collapse sidebar to icons only */
+@media (min-width: 1024px) {
+  .sidebar-collapsed #sidebar { width: 5.5rem; }
+  .sidebar-collapsed #main-wrap { padding-left: 5.5rem; }
+  .sidebar-collapsed .sidebar-label { display: none; }
+  .sidebar-collapsed .sidebar-center { justify-content: center; }
+  .sidebar-collapsed .nav-link { justify-content: center; padding-left: 0.5rem; padding-right: 0.5rem; }
+}
+#sidebar { transition: width 0.3s ease, transform 0.3s ease; }
+#main-wrap { transition: padding-left 0.3s ease; }
+
+/* ---------- Toast notifications ---------- */
+.toast {
+  position: relative;
+  overflow: hidden;
+  animation: toast-in 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+}
+.toast.toast-out { animation: toast-out 0.3s ease forwards; }
+.toast-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  transform-origin: left;
+  animation: toast-bar 5s linear forwards;
+}
+@keyframes toast-in  { from { opacity: 0; transform: translateY(-12px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(24px); } }
+@keyframes toast-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* ---------- Small animations ---------- */
+.float-slow { animation: float-y 6s ease-in-out infinite; }
+@keyframes float-y { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+.fade-up { animation: fade-up 0.6s ease both; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Form niceties ---------- */
+.input-icon-wrap { position: relative; }
+.input-icon-wrap > i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); pointer-events: none; }
+
+/* Thin scrollbars */
+* { scrollbar-width: thin; scrollbar-color: rgba(100, 116, 139, 0.35) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); border-radius: 9999px; }
+
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

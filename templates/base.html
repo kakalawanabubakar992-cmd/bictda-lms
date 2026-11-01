@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a1a4f">
+  <meta name="description" content="{{ app_full_name }} - {{ agency_name }}">
+  <title>{{ title ~ ' · ' if title }}{{ app_name }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
+
+  <!-- Font: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+
+  <!-- Icons: Font Awesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" referrerpolicy="no-referrer">
+
+  <!-- Tailwind CSS (CDN) + BICTDA colour palette -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+          colors: {
+            royal: {
+              50: '#eef3ff', 100: '#dbe5ff', 200: '#bed0ff', 300: '#93b4ff', 400: '#608bfa',
+              500: '#3b63f3', 600: '#2546e0', 700: '#1d36c4', 800: '#1c2f9e', 900: '#1c2c7d', 950: '#0a1a4f'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+
+  <!-- Remember collapsed sidebar before the page paints (no flicker) -->
+  <script>
+    try { if (localStorage.getItem('bictda-sidebar') === 'collapsed') document.documentElement.classList.add('sidebar-collapsed'); } catch (e) {}
+  </script>
+  {% block head %}{% endblock %}
+</head>
+
+<body class="h-full font-sans antialiased text-slate-800 {{ 'bg-[#081233]' if public_page else 'app-bg' }}">
+
+  {% include "partials/_flash.html" %}
+
+  {% if current_user.is_authenticated and not public_page %}
+    {# ================= SIGNED-IN LAYOUT: sidebar + top bar + content ================= #}
+    {% include "partials/_sidebar.html" %}
+    <div id="sidebar-overlay" class="fixed inset-0 z-30 hidden bg-slate-950/60 backdrop-blur-sm lg:hidden" data-sidebar-close></div>
+
+    <div id="main-wrap" class="flex min-h-full flex-col lg:pl-72">
+      {% include "partials/_topbar.html" %}
+      <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        {% block content %}{% endblock %}
+      </main>
+      <footer class="px-4 pb-6 text-center text-xs text-slate-400 sm:px-6 lg:px-8">
+        &copy; {{ current_year }} {{ agency_name }} &middot; {{ app_full_name }}
+      </footer>
+    </div>
+  {% else %}
+    {# ================= PUBLIC LAYOUT: landing, sign-in and error pages ================= #}
+    {% block public %}{% endblock %}
+  {% endif %}
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

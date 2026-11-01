@@ -1,0 +1,24 @@
+{# Toast notifications for flash() messages. JavaScript can also add toasts here (BICTDA.toast). #}
+{% set toast_styles = {
+  "success": ("emerald", "fa-circle-check"),
+  "error":   ("rose",    "fa-circle-exclamation"),
+  "warning": ("amber",   "fa-triangle-exclamation"),
+  "info":    ("sky",     "fa-circle-info"),
+} %}
+<div id="toast-stack" class="pointer-events-none fixed inset-x-0 top-4 z-[60] flex flex-col items-center gap-3 px-4 sm:inset-x-auto sm:right-5 sm:items-end" aria-live="polite">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      {% set style = toast_styles.get(category, toast_styles["info"]) %}
+      <div class="toast pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border border-{{ style[0] }}-200 bg-white/95 p-4 shadow-xl backdrop-blur" role="status" data-toast>
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-{{ style[0] }}-100 text-{{ style[0] }}-600">
+          <i class="fa-solid {{ style[1] }}"></i>
+        </span>
+        <p class="flex-1 pt-1.5 text-sm font-medium text-slate-700">{{ message }}</p>
+        <button type="button" class="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label="Dismiss" data-toast-close>
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <span class="toast-bar bg-{{ style[0] }}-500"></span>
+      </div>
+    {% endfor %}
+  {% endwith %}
+</div>

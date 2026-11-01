@@ -1,0 +1,73 @@
+{% from "partials/_macros.html" import logo, avatar, programme_badge %}
+
+{# Menu items: (endpoint, icon, label) #}
+{% if current_user.is_facilitator %}
+  {% set nav_items = [
+    ("facilitator.dashboard",   "fa-solid fa-gauge-high",      "Dashboard"),
+    ("facilitator.attendance",  "fa-solid fa-user-check",      "Mark Attendance"),
+    ("facilitator.assignments", "fa-solid fa-file-pen",        "Assignments"),
+    ("facilitator.grading",     "fa-solid fa-clipboard-check", "Grade Submissions"),
+    ("facilitator.results",     "fa-solid fa-award",           "Final Results"),
+    ("facilitator.interns",     "fa-solid fa-users",           "Interns"),
+  ] %}
+  {% set portal_label = "Facilitator Portal" %}
+{% else %}
+  {% set nav_items = [
+    ("intern.dashboard",   "fa-solid fa-gauge-high",     "Dashboard"),
+    ("intern.courses",     "fa-solid fa-layer-group",    "My Courses"),
+    ("intern.assignments", "fa-solid fa-file-pen",       "Assignments"),
+    ("intern.attendance",  "fa-solid fa-calendar-check", "Attendance"),
+    ("intern.profile",     "fa-solid fa-id-badge",       "My Profile"),
+  ] %}
+  {% set portal_label = "Intern Portal" %}
+{% endif %}
+
+<aside id="sidebar" class="sidebar-bg fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col text-white shadow-2xl lg:translate-x-0" aria-label="Main navigation">
+  <div class="sidebar-pattern"></div>
+
+  <!-- Logo -->
+  <div class="sidebar-center relative flex h-16 shrink-0 items-center justify-between gap-2 border-b border-white/10 px-5">
+    <a href="{{ home_url }}" class="min-w-0">{{ logo(38, true, "sb") }}</a>
+    <button type="button" class="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white lg:hidden" aria-label="Close menu" data-sidebar-close>
+      <i class="fa-solid fa-xmark text-lg"></i>
+    </button>
+  </div>
+
+  <!-- Signed-in user -->
+  <div class="relative px-4 pt-5">
+    <div class="sidebar-center flex items-center gap-3 rounded-2xl bg-white/[0.07] p-3 ring-1 ring-white/10">
+      {{ avatar(current_user, "h-10 w-10", "text-sm") }}
+      <div class="sidebar-label min-w-0">
+        <p class="truncate text-sm font-semibold">{{ current_user.full_name }}</p>
+        <p class="truncate text-[11px] text-white/60">{{ current_user.login_id }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu -->
+  <nav class="relative mt-5 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+    <p class="sidebar-label px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">{{ portal_label }}</p>
+    {% for endpoint, icon, label in nav_items %}
+      {% set active = request.endpoint == endpoint %}
+      <a href="{{ url_for(endpoint) }}" title="{{ label }}"
+         class="nav-link group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition {{ 'active' if active else 'text-white/70 hover:bg-white/10 hover:text-white' }}"
+         {% if active %}aria-current="page"{% endif %}>
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {{ 'bg-white/15 text-emerald-300' if active else 'bg-white/5 group-hover:bg-white/10' }}">
+          <i class="{{ icon }}"></i>
+        </span>
+        <span class="sidebar-label truncate">{{ label }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <!-- Sign out -->
+  <div class="relative border-t border-white/10 p-3">
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" title="Sign out" class="nav-link flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-rose-200 transition hover:bg-rose-500/15 hover:text-white">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5"><i class="fa-solid fa-right-from-bracket"></i></span>
+        <span class="sidebar-label">Sign Out</span>
+      </button>
+    </form>
+  </div>
+</aside>

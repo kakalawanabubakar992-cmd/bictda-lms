@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import logo %}
+{% set public_page = true %}
+
+{# Settings for each intern sign-in method (label, placeholder, input type, icon) #}
+{% set method_ui = {
+  "email":     ("Email Address",   "e.g. aisha.goni@student.test", "email", "fa-solid fa-envelope",  "email"),
+  "intern_id": ("BICTDA Intern ID", "e.g. BICTDA-SIWES-001",        "text",  "fa-solid fa-id-card",   "text"),
+  "phone":     ("Phone Number",    "e.g. 0803 123 4501",           "tel",   "fa-solid fa-phone",     "tel"),
+} %}
+{% set is_intern = portal == "intern" %}
+{% set current_ui = method_ui[method] if is_intern else ("Facilitator ID", "e.g. BICTDA-FAC-001", "text", "fa-solid fa-id-badge", "text") %}
+
+{% block public %}
+<div class="bictda-hero-bg min-h-screen">
+  <span class="orb left-[-5rem] top-24 h-72 w-72 bg-emerald-500"></span>
+  <span class="orb bottom-0 right-[-4rem] h-80 w-80 bg-royal-500" style="animation-delay:-6s"></span>
+
+  <div class="mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-4 py-8 sm:px-8 lg:grid-cols-2 lg:gap-16">
+
+    <!-- ============ Left: branding (desktop & tablet) ============ -->
+    <div class="hidden text-white lg:block">
+      <a href="{{ url_for('auth.index') }}">{{ logo(52, true, "lp") }}</a>
+      <h1 class="mt-10 text-4xl font-extrabold leading-tight tracking-tight xl:text-5xl">
+        {% if is_intern %}Welcome back,<br><span class="text-gradient">future tech leader.</span>
+        {% else %}Guide the next<br><span class="text-gradient">generation of talent.</span>{% endif %}
+      </h1>
+      <p class="mt-5 max-w-md text-white/70">
+        {% if is_intern %}Continue your SIWES or NYSC learning track, submit assignments and follow your attendance and results in real time.
+        {% else %}Mark daily attendance, post assignments, grade submissions and enter final results that unlock each intern's next course.{% endif %}
+      </p>
+      <ul class="mt-8 space-y-4 text-sm text-white/80">
+        {% for icon, text in (
+          [("fa-layer-group", "4 sequential one-month courses"), ("fa-unlock-keyhole", "Next course unlocks above 50%"), ("fa-clock", "Punctual 100% · Late 50% · Absent 0%")]
+          if is_intern else
+          [("fa-user-check", "Fast daily attendance marking"), ("fa-file-pen", "Post and grade assignments"), ("fa-award", "Final results trigger automatic unlocks")]
+        ) %}
+          <li class="flex items-center gap-3">
+            <span class="glass flex h-9 w-9 items-center justify-center rounded-xl text-emerald-300"><i class="fa-solid {{ icon }}"></i></span>{{ text }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- ============ Right: sign-in card ============ -->
+    <div class="mx-auto w-full max-w-md fade-up">
+      <div class="mb-6 flex justify-center lg:hidden">
+        <a href="{{ url_for('auth.index') }}">{{ logo(46, true, "lm") }}</a>
+      </div>
+
+      <div class="glass-strong rounded-3xl p-6 sm:p-8">
+        <!-- Portal switch -->
+        <div class="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 text-sm font-semibold">
+          <a href="{{ url_for('auth.login_intern', next=request.args.get('next')) }}"
+             class="flex items-center justify-center gap-2 rounded-xl py-2.5 transition {{ 'bg-white text-royal-700 shadow' if is_intern else 'text-slate-500 hover:text-slate-700' }}">
+            <i class="fa-solid fa-user-graduate"></i> Intern
+          </a>
+          <a href="{{ url_for('auth.login_facilitator', next=request.args.get('next')) }}"
+             class="flex items-center justify-center gap-2 rounded-xl py-2.5 transition {{ 'bg-white text-royal-700 shadow' if not is_intern else 'text-slate-500 hover:text-slate-700' }}">
+            <i class="fa-solid fa-chalkboard-user"></i> Facilitator
+          </a>
+        </div>
+
+        <div class="mt-6">
+          <h2 class="text-2xl font-extrabold text-slate-900">{{ "Intern Sign In" if is_intern else "Facilitator Sign In" }}</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            {{ "Use your email, Intern ID or phone number." if is_intern else "Use your BICTDA Facilitator ID." }}
+          </p>
+        </div>
+
+        <form method="post" class="mt-6 space-y-5" novalidate
+              action="{{ url_for('auth.login_intern' if is_intern else 'auth.login_facilitator', next=request.args.get('next')) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          {% if is_intern %}
+            <input type="hidden" name="method" id="login-method" value="{{ method }}">
+            <!-- Email / Intern ID / Phone tabs -->
+            <div class="grid grid-cols-3 gap-2" role="tablist" aria-label="Sign in with">
+              {% for key, label in methods.items() %}
+                {% set ui = method_ui[key] %}
+                <button type="button" role="tab" aria-selected="{{ 'true' if key == method else 'false' }}"
+                        data-login-tab="{{ key }}" data-label="{{ ui[0] }}" data-placeholder="{{ ui[1] }}"
+                        data-type="{{ ui[2] }}" data-icon="{{ ui[3] }}" data-inputmode="{{ ui[4] }}"
+                        class="login-tab flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-xs font-semibold transition
+                               {{ 'border-royal-500 bg-royal-50 text-royal-700' if key == method else 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700' }}">
+                  <i class="{{ ui[3] }} text-base"></i>{{ label }}
+                </button>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <!-- Identifier -->
+          <div>
+            <label for="identifier" id="identifier-label" class="mb-1.5 block text-sm font-semibold text-slate-700">{{ current_ui[0] }}</label>
+            <div class="input-icon-wrap">
+              <i id="identifier-icon" class="{{ current_ui[3] }} text-slate-400"></i>
+              <input id="identifier" name="identifier" type="{{ current_ui[2] }}" inputmode="{{ current_ui[4] }}"
+                     value="{{ identifier }}" placeholder="{{ current_ui[1] }}" required autocomplete="username"
+                     class="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-royal-500 focus:ring-4 focus:ring-royal-500/15">
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div>
+            <label for="password" class="mb-1.5 block text-sm font-semibold text-slate-700">Password</label>
+            <div class="input-icon-wrap">
+              <i class="fa-solid fa-lock text-slate-400"></i>
+              <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="Enter your password"
+                     class="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-12 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-royal-500 focus:ring-4 focus:ring-royal-500/15">
+              <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:text-slate-600"
+                      aria-label="Show password" data-password-toggle="password">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <label class="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" name="remember" value="1" class="h-4 w-4 rounded border-slate-300 text-royal-600 focus:ring-royal-500">
+            Keep me signed in on this device
+          </label>
+
+          <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-royal-600 to-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-royal-600/25 transition hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-royal-500/30">
+            <i class="fa-solid fa-right-to-bracket"></i> Sign In
+          </button>
+        </form>
+
+        {% if show_demo_logins and (demo.interns or demo.facilitators) %}
+          <!-- Demo accounts (for testing and project screenshots) -->
+          <details class="group mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+            <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-700">
+              <span><i class="fa-solid fa-flask mr-2 text-emerald-600"></i>Demo accounts</span>
+              <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition group-open:rotate-180"></i>
+            </summary>
+            <p class="mt-2 text-xs text-slate-500">Tap an account to fill the form.</p>
+            <div class="mt-3 space-y-2">
+              {% if is_intern %}
+                {% for user in demo.interns %}
+                  <button type="button" data-demo-fill data-method="intern_id" data-id="{{ user.intern_id }}" data-password="{{ demo.intern_password }}"
+                          class="flex w-full items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 transition hover:ring-royal-400">
+                    <span><span class="font-bold text-slate-800">{{ user.intern_id }}</span><span class="block text-slate-500">{{ user.full_name }}</span></span>
+                    <span class="font-mono text-slate-500">{{ demo.intern_password }}</span>
+                  </button>
+                {% endfor %}
+              {% else %}
+                {% for user in demo.facilitators %}
+                  <button type="button" data-demo-fill data-id="{{ user.facilitator_id }}" data-password="{{ demo.facilitator_password }}"
+                          class="flex w-full items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 transition hover:ring-royal-400">
+                    <span><span class="font-bold text-slate-800">{{ user.facilitator_id }}</span><span class="block text-slate-500">{{ user.full_name }}</span></span>
+                    <span class="font-mono text-slate-500">{{ demo.facilitator_password }}</span>
+                  </button>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </details>
+        {% endif %}
+      </div>
+
+      <p class="mt-6 text-center text-sm text-white/70">
+        <a href="{{ url_for('auth.index') }}" class="font-semibold text-white hover:text-emerald-300"><i class="fa-solid fa-arrow-left mr-1.5"></i>Back to portal home</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

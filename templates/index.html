@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import logo %}
+{% set public_page = true %}
+
+{% block public %}
+<div class="bictda-hero-bg min-h-screen text-white">
+  <span class="orb left-[-6rem] top-40 h-72 w-72 bg-emerald-500"></span>
+  <span class="orb right-[-5rem] top-10 h-80 w-80 bg-royal-500" style="animation-delay:-5s"></span>
+
+  <!-- ================= Top navigation ================= -->
+  <header class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
+    <a href="{{ url_for('auth.index') }}">{{ logo(44, true, "nav") }}</a>
+    <nav class="flex items-center gap-2">
+      {% if current_user.is_authenticated %}
+        <a href="{{ home_url }}" class="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-royal-950 shadow-lg transition hover:bg-emerald-50">
+          <i class="fa-solid fa-gauge-high mr-1.5"></i>Go to Dashboard
+        </a>
+      {% else %}
+        <a href="{{ url_for('auth.login_facilitator') }}" class="hidden rounded-xl px-4 py-2.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white sm:inline-flex">Facilitator Sign In</a>
+        <a href="{{ url_for('auth.login_intern') }}" class="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-emerald-950 shadow-lg shadow-emerald-500/25 transition hover:brightness-110">
+          Intern Sign In
+        </a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <!-- ================= Hero ================= -->
+  <section class="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-2 lg:pb-24 lg:pt-14">
+    <div class="fade-up">
+      <span class="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold text-emerald-200">
+        <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></span>
+        Borno State ICT Development Agency
+      </span>
+      <h1 class="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">
+        Build real digital skills,<br>
+        <span class="text-gradient">one month at a time.</span>
+      </h1>
+      <p class="mt-6 max-w-xl text-base leading-relaxed text-white/75 sm:text-lg">
+        The official learning portal for <strong class="text-white">SIWES</strong> students and
+        <strong class="text-white">NYSC</strong> corps members at BICTDA. Follow a guided 4-month track,
+        submit assignments, track your punctuality and unlock each new course by scoring above 50%.
+      </p>
+      <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+        <a href="{{ url_for('auth.login_intern') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3.5 text-sm font-bold text-royal-950 shadow-xl transition hover:-translate-y-0.5 hover:bg-emerald-50">
+          <i class="fa-solid fa-user-graduate"></i> Intern Sign In
+        </a>
+        <a href="{{ url_for('auth.login_facilitator') }}" class="glass inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/15">
+          <i class="fa-solid fa-chalkboard-user"></i> Facilitator Sign In
+        </a>
+      </div>
+      <dl class="mt-10 grid max-w-lg grid-cols-3 gap-4">
+        <div><dt class="text-xs text-white/55">Interns</dt><dd class="text-2xl font-extrabold">{{ stats.interns }}</dd></div>
+        <div><dt class="text-xs text-white/55">Courses</dt><dd class="text-2xl font-extrabold">{{ stats.courses }}</dd></div>
+        <div><dt class="text-xs text-white/55">Per course</dt><dd class="text-2xl font-extrabold">4 wks</dd></div>
+      </dl>
+    </div>
+
+    <!-- Learning path preview card -->
+    {% set preview = programmes[0] if programmes else None %}
+    <div class="float-slow relative mx-auto w-full max-w-md lg:max-w-none">
+      <div class="glass rounded-3xl p-6 sm:p-8">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-emerald-300">Learning Path</p>
+            <p class="mt-1 text-lg font-bold">{{ preview.code if preview else "SIWES" }} Track &middot; 4 Months</p>
+          </div>
+          <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300"><i class="fa-solid fa-route"></i></span>
+        </div>
+        <ol class="mt-6 space-y-3">
+          {% for course in (preview.courses if preview else []) %}
+            {% set state = "done" if loop.index == 1 else ("active" if loop.index == 2 else "locked") %}
+            <li class="flex items-center gap-4 rounded-2xl p-3 {{ 'bg-white/10 ring-1 ring-emerald-300/40' if state == 'active' else 'bg-white/[0.04]' }}">
+              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+                {{ 'bg-emerald-400 text-emerald-950' if state == 'done' else ('bg-royal-500 text-white' if state == 'active' else 'bg-white/10 text-white/50') }}">
+                <i class="{{ 'fa-solid fa-check' if state == 'done' else (course.icon if state == 'active' else 'fa-solid fa-lock') }}"></i>
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-[11px] font-semibold uppercase tracking-wide text-white/50">{{ course.month_label }}</span>
+                <span class="block truncate text-sm font-semibold {{ 'text-white/55' if state == 'locked' }}">{{ course.title }}</span>
+              </span>
+              <span class="text-[11px] font-bold {{ 'text-emerald-300' if state == 'done' else ('text-royal-200' if state == 'active' else 'text-white/40') }}">
+                {{ "78%" if state == "done" else ("Active" if state == "active" else "Locked") }}
+              </span>
+            </li>
+          {% endfor %}
+        </ol>
+        <div class="mt-6 flex items-center gap-3 rounded-2xl bg-emerald-400/10 p-4 text-sm text-emerald-100 ring-1 ring-emerald-300/20">
+          <i class="fa-solid fa-unlock-keyhole text-emerald-300"></i>
+          Score <strong class="mx-1 text-white">above 50%</strong> to unlock the next course automatically.
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= Programmes & course tracks ================= -->
+<section class="bg-slate-50 py-16 text-slate-800 sm:py-24">
+  <div class="mx-auto max-w-7xl px-5 sm:px-8">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-wider text-emerald-600">Programmes</p>
+      <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Two programmes. One clear path.</h2>
+      <p class="mt-4 text-slate-600">Every intern is enrolled under SIWES or NYSC and follows a strict sequence of four one-month courses.</p>
+    </div>
+
+    <div class="mt-12 grid gap-6 lg:grid-cols-2">
+      {% for programme in programmes %}
+        {% set is_siwes = programme.code == "SIWES" %}
+        <article class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div class="absolute -right-10 -top-10 h-40 w-40 rounded-full {{ 'bg-emerald-500/10' if is_siwes else 'bg-royal-500/10' }}"></div>
+          <div class="relative flex items-start gap-4">
+            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl {{ 'bg-emerald-100 text-emerald-600' if is_siwes else 'bg-royal-100 text-royal-600' }}">
+              <i class="fa-solid {{ 'fa-graduation-cap' if is_siwes else 'fa-flag' }} text-2xl"></i>
+            </span>
+            <div>
+              <h3 class="text-2xl font-extrabold text-slate-900">{{ programme.code }}</h3>
+              <p class="text-sm font-medium text-slate-500">{{ programme.name }}</p>
+            </div>
+          </div>
+          <p class="relative mt-4 text-sm leading-relaxed text-slate-600">{{ programme.description }}</p>
+          <ol class="relative mt-6 space-y-3">
+            {% for course in programme.courses %}
+              <li class="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-base shadow-sm {{ 'text-emerald-600' if is_siwes else 'text-royal-600' }}">
+                  <i class="{{ course.icon }}"></i>
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-[11px] font-bold uppercase tracking-wide text-slate-400">{{ course.month_label }} &middot; 4 weeks</span>
+                  <span class="block text-sm font-semibold text-slate-800">{{ course.title }}</span>
+                </span>
+                {% if not loop.first %}<i class="fa-solid fa-lock text-xs text-slate-300" title="Unlocks after passing the previous course"></i>{% endif %}
+              </li>
+            {% endfor %}
+          </ol>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ================= How it works ================= -->
+<section class="bg-white py-16 text-slate-800 sm:py-24">
+  <div class="mx-auto max-w-7xl px-5 sm:px-8">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-wider text-royal-600">How it works</p>
+      <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Fair, transparent progress tracking</h2>
+    </div>
+    <div class="mt-12 grid gap-6 md:grid-cols-3">
+      <div class="rounded-3xl border border-slate-200 p-6">
+        <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-royal-100 text-royal-600"><i class="fa-solid fa-layer-group text-xl"></i></span>
+        <h3 class="mt-5 text-lg font-bold text-slate-900">Sequential courses</h3>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">Start with Course 1. The next course stays locked until your facilitator records a final score <strong>above 50%</strong>.</p>
+      </div>
+      <div class="rounded-3xl border border-slate-200 p-6">
+        <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><i class="fa-solid fa-clock text-xl"></i></span>
+        <h3 class="mt-5 text-lg font-bold text-slate-900">Punctuality counts</h3>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">Daily attendance credit: <strong>Punctual 100%</strong>, <strong>Late 50%</strong>, <strong>Absent 0%</strong>. Your 1-month rate updates automatically.</p>
+      </div>
+      <div class="rounded-3xl border border-slate-200 p-6">
+        <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-600"><i class="fa-solid fa-file-pen text-xl"></i></span>
+        <h3 class="mt-5 text-lg font-bold text-slate-900">Assignments &amp; grades</h3>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">Submit work and links online, receive scores and feedback, and see your final course result on your dashboard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Portal cards ================= -->
+<section class="bictda-hero-bg py-16 text-white sm:py-20">
+  <div class="mx-auto grid max-w-5xl gap-6 px-5 sm:px-8 md:grid-cols-2">
+    <a href="{{ url_for('auth.login_intern') }}" class="glass group rounded-3xl p-7 transition hover:-translate-y-1 hover:bg-white/[0.12]">
+      <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300"><i class="fa-solid fa-user-graduate text-2xl"></i></span>
+      <h3 class="mt-5 text-xl font-bold">Intern Sign In</h3>
+      <p class="mt-2 text-sm text-white/70">SIWES students and NYSC corps members. Sign in with your email, BICTDA Intern ID or phone number.</p>
+      <span class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-300">Continue <i class="fa-solid fa-arrow-right transition group-hover:translate-x-1"></i></span>
+    </a>
+    <a href="{{ url_for('auth.login_facilitator') }}" class="glass group rounded-3xl p-7 transition hover:-translate-y-1 hover:bg-white/[0.12]">
+      <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-royal-400/20 text-royal-200"><i class="fa-solid fa-chalkboard-user text-2xl"></i></span>
+      <h3 class="mt-5 text-xl font-bold">Facilitator Sign In</h3>
+      <p class="mt-2 text-sm text-white/70">Teachers and facilitators. Sign in with your Facilitator ID to mark attendance, post assignments and grade.</p>
+      <span class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-royal-200">Continue <i class="fa-solid fa-arrow-right transition group-hover:translate-x-1"></i></span>
+    </a>
+  </div>
+  <p class="mt-12 px-5 text-center text-xs text-white/50">&copy; {{ current_year }} {{ agency_name }} (BICTDA)</p>
+</section>
+{% endblock %}

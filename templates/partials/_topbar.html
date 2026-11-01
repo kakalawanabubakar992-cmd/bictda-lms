@@ -1,0 +1,97 @@
+{% from "partials/_macros.html" import avatar, programme_badge, badge %}
+{% set unread = current_user.unread_notifications_count %}
+{% set recent_notifications = current_user.notifications[:6] %}
+
+<header class="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl">
+  <div class="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
+
+    <!-- Menu buttons: open drawer (phones) / collapse sidebar (desktop) -->
+    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Open menu" data-sidebar-open>
+      <i class="fa-solid fa-bars text-lg"></i>
+    </button>
+    <button type="button" class="hidden h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 lg:inline-flex" aria-label="Collapse menu" data-sidebar-collapse>
+      <i class="fa-solid fa-bars-staggered"></i>
+    </button>
+
+    <!-- Page title -->
+    <div class="min-w-0 flex-1">
+      <h1 class="truncate text-base font-bold text-slate-900 sm:text-lg">{{ title or "Dashboard" }}</h1>
+      <p class="hidden text-xs text-slate-500 sm:block">{{ today|date("%A, %d %B %Y") }}</p>
+    </div>
+
+    <!-- Notifications -->
+    <div class="relative" data-dropdown>
+      <button type="button" class="relative inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100" aria-label="Notifications" data-dropdown-toggle>
+        <i class="fa-regular fa-bell text-lg"></i>
+        {% if unread %}
+          <span class="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">{{ unread if unread < 10 else "9+" }}</span>
+        {% endif %}
+      </button>
+      <div class="absolute right-0 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" data-dropdown-menu>
+        <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+          <p class="text-sm font-bold text-slate-900">Notifications</p>
+          {% if unread %}
+            <form method="post" action="{{ url_for('read_all_notifications') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="text-xs font-semibold text-royal-600 hover:text-royal-700">Mark all as read</button>
+            </form>
+          {% endif %}
+        </div>
+        <div class="max-h-80 overflow-y-auto">
+          {% for note in recent_notifications %}
+            <a href="{{ url_for('open_notification', notification_id=note.id) }}" class="flex gap-3 px-4 py-3 transition hover:bg-slate-50 {{ 'bg-royal-50/60' if not note.is_read }}">
+              <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {{ 'bg-royal-100 text-royal-600' if not note.is_read else 'bg-slate-100 text-slate-500' }}">
+                <i class="{{ note.icon or 'fa-solid fa-bell' }} text-sm"></i>
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm {{ 'font-semibold text-slate-800' if not note.is_read else 'text-slate-600' }}">{{ note.message }}</span>
+                <span class="mt-0.5 block text-[11px] text-slate-400">{{ note.created_at|timeago }}</span>
+              </span>
+            </a>
+          {% else %}
+            <div class="px-4 py-8 text-center text-sm text-slate-500">
+              <i class="fa-regular fa-bell-slash mb-2 block text-2xl text-slate-300"></i>No notifications yet
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile menu -->
+    <div class="relative" data-dropdown>
+      <button type="button" class="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-slate-100" aria-label="Account menu" data-dropdown-toggle>
+        {{ avatar(current_user, "h-9 w-9", "text-xs") }}
+        <span class="hidden text-left sm:block">
+          <span class="block max-w-[10rem] truncate text-sm font-semibold text-slate-800">{{ current_user.full_name.split()[0] if current_user.is_intern else current_user.full_name }}</span>
+          <span class="block text-[11px] text-slate-500">{{ "Facilitator" if current_user.is_facilitator else current_user.programme.code ~ " Intern" }}</span>
+        </span>
+        <i class="fa-solid fa-chevron-down hidden text-[10px] text-slate-400 sm:block"></i>
+      </button>
+      <div class="absolute right-0 mt-2 hidden w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" data-dropdown-menu>
+        <div class="border-b border-slate-100 p-4">
+          <p class="truncate text-sm font-bold text-slate-900">{{ current_user.full_name }}</p>
+          <p class="truncate text-xs text-slate-500">{{ current_user.email }}</p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            {% if current_user.is_intern %}
+              {{ programme_badge(current_user.programme.code) }}
+            {% else %}
+              {{ badge("Facilitator", "royal", "fa-solid fa-chalkboard-user") }}
+            {% endif %}
+            <span class="text-[11px] font-medium text-slate-500">{{ current_user.login_id }}</span>
+          </div>
+        </div>
+        <div class="p-2">
+          {% if current_user.is_intern %}
+            <a href="{{ url_for('intern.profile') }}" class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><i class="fa-solid fa-id-badge w-4 text-slate-400"></i>My Profile</a>
+          {% endif %}
+          <a href="{{ home_url }}" class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><i class="fa-solid fa-gauge-high w-4 text-slate-400"></i>Dashboard</a>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"><i class="fa-solid fa-right-from-bracket w-4"></i>Sign Out</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</header>
