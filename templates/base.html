@@ -8,6 +8,14 @@
   <title>{{ title ~ ' · ' if title }}{{ app_name }}</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/bictda-logo.png') }}">
 
+  <!-- Installable app (PWA) -->
+  <link rel="manifest" href="{{ url_for('manifest') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="{{ app_name }}">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
   <!-- Font: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,12 +56,13 @@
 
   {% if current_user.is_authenticated and not public_page %}
     {# ================= SIGNED-IN LAYOUT: sidebar + top bar + content ================= #}
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-xl focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:text-royal-700 focus:shadow-lg">Skip to main content</a>
     {% include "partials/_sidebar.html" %}
     <div id="sidebar-overlay" class="fixed inset-0 z-30 hidden bg-slate-950/60 backdrop-blur-sm lg:hidden" data-sidebar-close></div>
 
     <div id="main-wrap" class="flex min-h-full flex-col lg:pl-72">
       {% include "partials/_topbar.html" %}
-      <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+      <main id="main" class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
         {% block content %}{% endblock %}
       </main>
       <footer class="px-4 pb-6 text-center text-xs text-slate-400 sm:px-6 lg:px-8">
@@ -64,6 +73,12 @@
     {# ================= PUBLIC LAYOUT: landing, sign-in and error pages ================= #}
     {% block public %}{% endblock %}
   {% endif %}
+
+  <!-- "Install app" button: shown by app.js only when the browser offers installation (Android / desktop Chrome) -->
+  <button type="button" data-install-app
+          class="fixed bottom-4 right-4 z-50 hidden items-center gap-2 rounded-full bg-gradient-to-r from-royal-600 to-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-xl transition hover:brightness-110">
+    <i class="fa-solid fa-mobile-screen-button"></i> Install app
+  </button>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>

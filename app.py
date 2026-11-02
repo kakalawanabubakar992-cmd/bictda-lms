@@ -11,8 +11,9 @@ What happens here:
   4. Create the database tables and seed demo data if the database is empty
   5. Error pages, health check, notifications and template helpers
 """
+import json
 import os
-from flask import Flask, abort, flash, redirect, render_template, request, url_for
+from flask import Flask, Response, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from flask_wtf.csrf import CSRFError
 from sqlalchemy import text
@@ -124,6 +125,33 @@ def create_app(config_class=Config):
             return {"status": "ok", "time_wat": now_wat().isoformat(timespec="seconds")}, 200
         except Exception:
             return {"status": "database_error"}, 500
+
+    # ----- Installable app (PWA): manifest + service worker, both served from the site root
+    @app.route("/manifest.webmanifest")
+    def manifest():
+        def icon(name, size, purpose="any"):
+            return {"src": url_for("static", filename=f"icons/{name}"), "sizes": size, "type": "image/png", "purpose": purpose}
+        data = {
+            "name": app.config["APP_FULL_NAME"],
+            "short_name": app.config["APP_NAME"],
+            "description": f"{app.config['AGENCY_NAME']} - internship and learning portal for SIWES and NYSC.",
+            "start_url": "/login",          # signed-in users go straight to their dashboard
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#0a1a4f",
+            "theme_color": "#0a1a4f",
+            "icons": [icon("icon-192.png", "192x192"), icon("icon-512.png", "512x512"),
+                      icon("icon-maskable-512.png", "512x512", "maskable")],
+        }
+        return Response(json.dumps(data), mimetype="application/manifest+json")
+
+    @app.route("/service-worker.js")
+    def service_worker():
+        # Served from "/" so it controls every page. The version is filled in on each deploy.
+        with open(os.path.join(app.static_folder, "service-worker.js"), encoding="utf-8") as f:
+            script = f.read().replace("__APP_VERSION__", app.config["APP_VERSION"])
+        return Response(script, mimetype="application/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
 
     # ----- Notifications (bell icon)
     @app.route("/notifications/<int:notification_id>")

@@ -260,6 +260,43 @@
     document.querySelectorAll("canvas[data-chart]").forEach(drawChart);
   }
 
+  /* ---------- Installable app (PWA): register the service worker and announce updates ---------- */
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      var hadController = !!navigator.serviceWorker.controller;   // false on the very first visit
+      navigator.serviceWorker.register("/service-worker.js").then(function (registration) {
+        // Check for a new version whenever the app comes back to the screen (phones keep apps open)
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") registration.update();
+        });
+      }).catch(function () { /* app still works without it */ });
+
+      navigator.serviceWorker.addEventListener("controllerchange", function () {
+        if (!hadController) { hadController = true; return; }       // first install, not an update
+        showToast("A new version of BICTDA LMS is available.", "info", "Reload", function () { location.reload(); });
+      });
+    });
+  }
+
+  /* "Install app" button (Chrome on Android / desktop fire beforeinstallprompt; iPhone uses Share -> Add to Home Screen) */
+  var installButton = document.querySelector("[data-install-app]");
+  var installPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (event) {
+    event.preventDefault();
+    installPrompt = event;
+    if (installButton) { installButton.classList.remove("hidden"); installButton.classList.add("inline-flex"); }
+  });
+  if (installButton) {
+    installButton.addEventListener("click", function () {
+      if (!installPrompt) return;
+      installPrompt.prompt();
+      installPrompt = null;
+      installButton.classList.add("hidden");
+      installButton.classList.remove("inline-flex");
+    });
+  }
+  window.addEventListener("appinstalled", function () { showToast("BICTDA LMS was installed on this device.", "success"); });
+
   /* ---------- "Mark all" buttons: <button data-mark-all="PUNCTUAL"> ticks that radio for every row in its form ---------- */
   document.querySelectorAll("[data-mark-all]").forEach(function (btn) {
     btn.addEventListener("click", function () {

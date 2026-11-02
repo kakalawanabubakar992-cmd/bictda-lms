@@ -50,6 +50,15 @@ python seed.py                       # creates bictda_lms.db with demo data
 | NYSC Intern | BICTDA-NYSC-001 | Intern@123 |
 | NYSC Intern | BICTDA-NYSC-002 | Intern@123 |
 
+## Install on a phone (PWA)
+The LMS is a Progressive Web App:
+- **Android (Chrome):** open the site, tap **Install app** (or menu **⋮ → Add to Home screen / Install app**).
+- **iPhone (Safari):** open the site, tap **Share → Add to Home Screen**.
+
+Updates are automatic: every `git push` deploys a new version, and installed apps show
+"A new version of BICTDA LMS is available - Reload". If there is no internet, a friendly offline page is shown.
+Installing needs HTTPS, so test it on the live Render link (or `http://127.0.0.1:5000` on your laptop).
+
 ## Facilitator IDs
 BICTDA issues Facilitator IDs. The admin adds them in one place: `ISSUED_FACILITATOR_IDS` in `seed.py`.
 New IDs are saved to the database the next time the app starts. Each ID can be used to sign up only once.

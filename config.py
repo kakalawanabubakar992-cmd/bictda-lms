@@ -6,7 +6,7 @@ same code runs on your laptop (SQLite) and on Render (Neon PostgreSQL)
 without any changes.
 """
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -67,6 +67,10 @@ class Config:
     REMEMBER_COOKIE_DURATION = timedelta(days=14)
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SECURE = IS_PRODUCTION
+
+    # App version - changes on every deploy so installed phone apps update themselves.
+    # Render sets RENDER_GIT_COMMIT; on your laptop the start-up time is used instead.
+    APP_VERSION = os.environ.get("RENDER_GIT_COMMIT", "")[:12] or datetime.now().strftime("%Y%m%d%H%M%S")
 
     # Branding
     APP_NAME = "BICTDA LMS"
