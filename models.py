@@ -4,7 +4,7 @@ models.py - Database models (tables) for BICTDA LMS.
 Tables:
     programmes        SIWES and NYSC
     users             Interns AND Facilitators (one table, separated by "role")
-    courses           4 sequential 1-month courses per programme
+    courses           4 sequential courses shared by SIWES and NYSC (6 months in total)
     course_progress   One row per intern per course (LOCKED / ACTIVE / PASSED / FAILED)
     attendance        Daily attendance with punctuality credit (100 / 50 / 0)
     assignments       Posted by facilitators for a course
@@ -46,12 +46,23 @@ ATTENDANCE_CREDITS = {
     ATT_ABSENT: 0,       # absent       -> no credit
 }
 
-# An intern passes a course only if the final score is STRICTLY GREATER than 50.
-# Exactly 50% is a FAIL.
+# PASS MARK - the ONE place to change it. An intern passes a course when the
+# final score is EQUAL TO OR GREATER than this value (so exactly 50% is a PASS).
 PASS_MARK = 50
 
-COURSE_DURATION_WEEKS = 4
+COURSE_DURATION_WEEKS = 4                          # 1 month = 4 weeks
 COURSE_DURATION_DAYS = COURSE_DURATION_WEEKS * 7   # 28 days = 1 month
+
+# Departments are profile information only: every intern follows the same course track.
+DEPT_CYBERSECURITY = "Cybersecurity"
+DEPT_SOFTWARE_DATA = "Software & Data"
+DEPARTMENTS = [DEPT_SOFTWARE_DATA, DEPT_CYBERSECURITY]
+
+
+def months_label(weeks):
+    """4 -> '1 month', 8 -> '2 months'."""
+    months = weeks // COURSE_DURATION_WEEKS
+    return f"{months} month{'s' if months != 1 else ''}"
 
 
 # ---------------------------------------------------------------------------
@@ -67,9 +78,6 @@ class Programme(db.Model):
     badge_color = db.Column(db.String(20), default="emerald")      # used by the UI
 
     interns = db.relationship("User", back_populates="programme")
-    courses = db.relationship(
-        "Course", back_populates="programme", order_by="Course.sequence_order"
-    )
 
     def __repr__(self):
         return f"<Programme {self.code}>"
@@ -95,6 +103,7 @@ class User(UserMixin, db.Model):
     # Intern-only fields
     programme_id = db.Column(db.Integer, db.ForeignKey("programmes.id"))
     institution = db.Column(db.String(150))   # SIWES: school / NYSC: place of primary assignment
+    department = db.Column(db.String(50), default=DEPT_SOFTWARE_DATA)   # profile info only
     enrollment_status = db.Column(db.String(20), default=ENROLL_ACTIVE)
     enrollment_date = db.Column(db.Date)
 
@@ -216,21 +225,16 @@ def load_user(user_id):
 # ---------------------------------------------------------------------------
 class Course(db.Model):
     __tablename__ = "courses"
-    __table_args__ = (
-        db.UniqueConstraint("programme_id", "sequence_order", name="uq_course_programme_sequence"),
-    )
 
     id = db.Column(db.Integer, primary_key=True)
-    programme_id = db.Column(db.Integer, db.ForeignKey("programmes.id"), nullable=False)
-    sequence_order = db.Column(db.Integer, nullable=False)        # 1, 2, 3, 4
-    code = db.Column(db.String(20), unique=True, nullable=False)  # e.g. SIWES-C1
+    sequence_order = db.Column(db.Integer, unique=True, nullable=False)  # 1, 2, 3, 4
+    code = db.Column(db.String(20), unique=True, nullable=False)  # e.g. C1
     title = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text)
-    duration_weeks = db.Column(db.Integer, default=COURSE_DURATION_WEEKS)
+    duration_weeks = db.Column(db.Integer, default=COURSE_DURATION_WEEKS)  # expected length (1 month = 4 weeks)
     icon = db.Column(db.String(50), default="fa-solid fa-book-open")  # Font Awesome classes
     facilitator_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
-    programme = db.relationship("Programme", back_populates="courses")
     facilitator = db.relationship("User", back_populates="taught_courses")
     progress_records = db.relationship("CourseProgress", back_populates="course")
     assignments = db.relationship(
@@ -241,12 +245,13 @@ class Course(db.Model):
     )
 
     @property
-    def month_label(self):
-        return f"Month {self.sequence_order}"
+    def order_label(self):
+        return f"Course {self.sequence_order}"
 
     @property
-    def duration_days(self):
-        return (self.duration_weeks or COURSE_DURATION_WEEKS) * 7
+    def length_label(self):
+        """Expected duration, e.g. '1 month' or '2 months'."""
+        return months_label(self.duration_weeks or COURSE_DURATION_WEEKS)
 
     def __repr__(self):
         return f"<Course {self.code}: {self.title}>"
@@ -267,9 +272,9 @@ class CourseProgress(db.Model):
     status = db.Column(db.String(20), nullable=False, default=STATUS_LOCKED)
 
     start_date = db.Column(db.Date)        # set when the course becomes ACTIVE
-    end_date = db.Column(db.Date)          # start_date + 28 days
+    end_date = db.Column(db.Date)          # start_date + expected length (a target, not a lock)
     final_score = db.Column(db.Float)      # 0-100, entered by facilitator
-    attendance_rate = db.Column(db.Float)  # 1-month attendance % saved when the course is graded
+    attendance_rate = db.Column(db.Float)  # course attendance % saved when the course is graded
     completed_at = db.Column(db.DateTime)
     graded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     updated_at = db.Column(db.DateTime, default=now_wat, onupdate=now_wat)
@@ -313,13 +318,25 @@ class CourseProgress(db.Model):
             STATUS_FAILED: "Retake Required",
         }.get(self.status, self.status)
 
-    # ----- 1-month schedule helpers
+    # ----- Schedule helpers (expected course length - the same for every intern)
+    @property
+    def duration_weeks(self):
+        return self.course.duration_weeks or COURSE_DURATION_WEEKS
+
+    @property
+    def duration_days(self):
+        return self.duration_weeks * 7
+
+    @property
+    def length_label(self):
+        return self.course.length_label
+
     @property
     def days_elapsed(self):
         if not self.start_date:
             return 0
         days = (today_wat() - self.start_date).days
-        return max(0, min(days, self.course.duration_days))
+        return max(0, min(days, self.duration_days))
 
     @property
     def time_progress_percent(self):
@@ -328,14 +345,14 @@ class CourseProgress(db.Model):
             return 100
         if not self.start_date:
             return 0
-        return round(self.days_elapsed / self.course.duration_days * 100)
+        return round(self.days_elapsed / self.duration_days * 100)
 
     @property
     def week_number(self):
-        """Week 1-4 of the course."""
+        """Current week of the course (1-4 or 1-8)."""
         if not self.start_date:
             return 0
-        return min(self.course.duration_weeks, self.days_elapsed // 7 + 1)
+        return min(self.duration_weeks, self.days_elapsed // 7 + 1)
 
     @property
     def days_remaining(self):

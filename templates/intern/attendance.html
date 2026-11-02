@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import badge, status_badge, metric_card %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6">
+
+  {% if not selected %}
+    <section class="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+      <i class="fa-regular fa-calendar mb-3 block text-4xl text-slate-300"></i>
+      <p class="text-sm text-slate-500">You have no active course yet.</p>
+    </section>
+  {% else %}
+
+  <!-- ============ Course selector ============ -->
+  <section class="flex flex-wrap items-center gap-2">
+    {% for p in unlocked %}
+      <a href="{{ url_for('intern.attendance', course=p.course_id) }}"
+         class="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition
+                {{ 'border-royal-500 bg-royal-600 text-white shadow' if p.id == selected.id else 'border-slate-200 bg-white text-slate-600 hover:border-slate-300' }}">
+        <i class="{{ p.course.icon }}"></i>{{ p.course.month_label }}: {{ p.course.title }}
+      </a>
+    {% endfor %}
+  </section>
+
+  <!-- ============ Summary cards ============ -->
+  {% set s = attendance.summary %}
+  <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {{ metric_card("fa-solid fa-chart-simple", "1-Month Attendance", attendance.rate ~ "%", attendance.label, "emerald") }}
+    {{ metric_card("fa-solid fa-circle-check", "Punctual (100%)", s.PUNCTUAL, "days on time", "royal") }}
+    {{ metric_card("fa-solid fa-clock", "Late (50%)", s.LATE, "days late", "amber") }}
+    {{ metric_card("fa-solid fa-circle-xmark", "Absent (0%)", s.ABSENT, "days absent", "rose") }}
+  </section>
+
+  <!-- ============ Trend chart ============ -->
+  <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Attendance Trend &middot; {{ selected.course.title }}</h3>
+        <p class="text-xs text-slate-500">{{ s.total }} class days marked &middot; {{ selected.start_date|date }} to {{ selected.end_date|date }}</p>
+      </div>
+      {{ status_badge(selected) }}
+    </div>
+    {% if attendance["values"] %}
+      <div class="mt-4 h-72">
+        <canvas data-chart="attendance" data-labels='{{ attendance["labels"]|tojson }}' data-values='{{ attendance["values"]|tojson }}' aria-label="Attendance trend chart"></canvas>
+      </div>
+    {% else %}
+      <p class="py-12 text-center text-sm text-slate-500">No attendance has been marked for this course yet.</p>
+    {% endif %}
+  </section>
+
+  <!-- ============ Attendance log ============ -->
+  <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-2 p-5 sm:p-6">
+      <h3 class="text-base font-bold text-slate-900">Attendance Log</h3>
+      <p class="text-xs text-slate-500">Punctual = 100% &middot; Late = 50% &middot; Absent = 0%</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[520px] text-left text-sm">
+        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th class="px-6 py-3 font-semibold">Date</th>
+            <th class="px-6 py-3 font-semibold">Status</th>
+            <th class="px-6 py-3 font-semibold">Credit</th>
+            <th class="px-6 py-3 font-semibold">Marked By</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for record in records %}
+            <tr class="hover:bg-slate-50/70">
+              <td class="whitespace-nowrap px-6 py-3 font-medium text-slate-800">{{ record.date|date("%a, %d %b %Y") }}</td>
+              <td class="px-6 py-3">{{ badge(record.status_label, record.badge_color) }}</td>
+              <td class="px-6 py-3 font-semibold text-slate-700">{{ record.credit }}%</td>
+              <td class="px-6 py-3 text-slate-500">{{ record.marked_by.full_name if record.marked_by else "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="px-6 py-10 text-center text-slate-500">No records yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -17,6 +17,9 @@ from models import (
     ATT_ABSENT,
     ATT_LATE,
     ATT_PUNCTUAL,
+    COURSE_DURATION_WEEKS,
+    DEPT_CYBERSECURITY,
+    DEPT_SOFTWARE_DATA,
     ROLE_FACILITATOR,
     ROLE_INTERN,
     Assignment,
@@ -42,81 +45,78 @@ INTERN_PASSWORD = "Intern@123"
 FACILITATOR_PASSWORD = "Facilitator@123"
 
 # ---------------------------------------------------------------------------
-# Programmes & course tracks
+# Programmes (both take the same 6-month course track)
 # ---------------------------------------------------------------------------
 PROGRAMMES = [
-    {
-        "code": "SIWES",
-        "name": "Students Industrial Work Experience Scheme",
-        "badge_color": "emerald",
-        "description": "Industrial training for university and polytechnic students "
-                       "on attachment at BICTDA.",
-        "courses": [
-            ("Web Development",
-             "Build modern websites with HTML, CSS and JavaScript basics: page structure, "
-             "styling, responsive layouts and simple interactivity.", "fa-solid fa-code"),
-            ("Data Science & Python",
-             "Python programming for data: variables, functions, Pandas, data cleaning, "
-             "exploratory analysis and charts.", "fa-solid fa-chart-line"),
-            ("Machine Learning",
-             "Supervised and unsupervised learning with scikit-learn: regression, "
-             "classification, model evaluation and a mini project.", "fa-solid fa-brain"),
-            ("Cybersecurity",
-             "Security fundamentals: networks, threats, passwords and encryption, "
-             "secure web practices and basic security auditing.", "fa-solid fa-shield-halved"),
-        ],
-    },
-    {
-        "code": "NYSC",
-        "name": "National Youth Service Corps",
-        "badge_color": "blue",
-        "description": "Digital skills training for corps members whose place of "
-                       "primary assignment (PPA) is BICTDA.",
-        "courses": [
-            ("HTML5 & Web Structure Fundamentals",
-             "Semantic HTML5, page structure, forms, tables, media and accessibility basics.",
-             "fa-brands fa-html5"),
-            ("CSS3 & Responsive UI Design",
-             "CSS3 styling, Flexbox, Grid, responsive design and modern UI principles.",
-             "fa-solid fa-palette"),
-            ("Python Programming (Beginners)",
-             "Python syntax, data types, control flow, functions, lists and dictionaries.",
-             "fa-brands fa-python"),
-            ("Python Advanced & Web Backend Development",
-             "OOP, modules, working with databases and building web backends with Flask.",
-             "fa-solid fa-server"),
-        ],
-    },
+    {"code": "SIWES", "name": "Students Industrial Work Experience Scheme", "badge_color": "emerald",
+     "description": "Industrial training for university and polytechnic students on attachment at BICTDA."},
+    {"code": "NYSC", "name": "National Youth Service Corps", "badge_color": "blue",
+     "description": "Digital skills training for corps members whose place of primary assignment (PPA) is BICTDA."},
 ]
 
+# ---------------------------------------------------------------------------
+# THE COURSE TRACK - edit the courses here (one place).
+# Every SIWES and NYSC intern takes them in THIS order: 1 + 2 + 1 + 2 = 6 months.
+#   (title, description, icon, expected duration in months)
+# ---------------------------------------------------------------------------
+COURSES = [
+    ("Web Development",
+     "Build modern websites with HTML, CSS and JavaScript basics: page structure, "
+     "styling, responsive layouts and simple interactivity.",
+     "fa-solid fa-code", 1),
+    ("Data Science & Python",
+     "Python programming for data: variables, functions, Pandas, data cleaning, "
+     "exploratory analysis and charts.",
+     "fa-solid fa-chart-line", 2),
+    ("Machine Learning",
+     "Supervised and unsupervised learning with scikit-learn: regression, "
+     "classification, model evaluation and a mini project.",
+     "fa-solid fa-brain", 1),
+    ("Cybersecurity",
+     "Security fundamentals: networks, threats, passwords and encryption, "
+     "secure web practices and basic security auditing.",
+     "fa-solid fa-shield-halved", 2),
+]
+
+
+def seed_courses():
+    """Create the courses from COURSES. Order in the list = sequence_order. Returns {order: Course}."""
+    courses = {}
+    for order, (title, description, icon, months) in enumerate(COURSES, start=1):
+        course = Course(sequence_order=order, code=f"C{order}", title=title, description=description,
+                        icon=icon, duration_weeks=months * COURSE_DURATION_WEEKS)
+        db.session.add(course)
+        courses[order] = course
+    db.session.flush()
+    return courses
+
+# teaches: course numbers (sequence_order) this facilitator is responsible for
 FACILITATORS = [
     {"full_name": "Engr. Babagana Modu", "email": "babagana.modu@bictda.test",
-     "phone": "08031110001", "specialization": "Software Engineering & Data Science",
-     "teaches": "SIWES"},
+     "phone": "08031110001", "specialization": "Data Science & Machine Learning", "teaches": [2, 3]},
     {"full_name": "Mrs. Fatima Bukar Kyari", "email": "fatima.kyari@bictda.test",
-     "phone": "08031110002", "specialization": "Web Development & Python Programming",
-     "teaches": "NYSC"},
+     "phone": "08031110002", "specialization": "Web Development & Cybersecurity", "teaches": [1, 4]},
 ]
 
 # scenario: what has happened to this intern so far
 #   "passed_c1" -> passed Course 1, now on Course 2
-#   "failed_c1" -> scored exactly 50% in Course 1 (FAIL), retake required
+#   "failed_c1" -> scored 45% in Course 1 (below the 50% pass mark), retake required
 #   "on_c1"     -> currently on Course 1
 INTERNS = [
     {"programme": "SIWES", "full_name": "Aisha Mohammed Goni", "email": "aisha.goni@student.test",
-     "phone": "08031234501", "institution": "University of Maiduguri",
+     "phone": "08031234501", "institution": "University of Maiduguri", "department": DEPT_SOFTWARE_DATA,
      "days_ago": 42, "scenario": "passed_c1", "attendance": "perfect"},
     {"programme": "SIWES", "full_name": "Umar Ali Bukar", "email": "umar.bukar@student.test",
-     "phone": "08031234502", "institution": "Ramat Polytechnic, Maiduguri",
+     "phone": "08031234502", "institution": "Ramat Polytechnic, Maiduguri", "department": DEPT_CYBERSECURITY,
      "days_ago": 35, "scenario": "failed_c1", "attendance": "weak"},
     {"programme": "SIWES", "full_name": "Hauwa Ibrahim Shettima", "email": "hauwa.shettima@student.test",
-     "phone": "08031234503", "institution": "Borno State University",
+     "phone": "08031234503", "institution": "Borno State University", "department": DEPT_CYBERSECURITY,
      "days_ago": 14, "scenario": "on_c1", "attendance": "good"},
     {"programme": "NYSC", "full_name": "Chinedu Emmanuel Okafor", "email": "chinedu.okafor@corps.test",
-     "phone": "08031234504", "institution": "PPA: BICTDA Headquarters, Maiduguri",
+     "phone": "08031234504", "institution": "PPA: BICTDA Headquarters, Maiduguri", "department": DEPT_SOFTWARE_DATA,
      "days_ago": 21, "scenario": "on_c1", "attendance": "good"},
     {"programme": "NYSC", "full_name": "Zainab Musa Lawan", "email": "zainab.lawan@corps.test",
-     "phone": "08031234505", "institution": "PPA: BICTDA Headquarters, Maiduguri",
+     "phone": "08031234505", "institution": "PPA: BICTDA Headquarters, Maiduguri", "department": DEPT_CYBERSECURITY,
      "days_ago": 14, "scenario": "on_c1", "attendance": "excellent"},
 ]
 
@@ -128,10 +128,10 @@ ATTENDANCE_PROFILES = {
     "weak": (0.50, 0.25, 0.25),
 }
 
-# Assignments: (programme, course sequence) -> [(title, instructions, due in N days, max score)]
+# Assignments: course number -> [(title, instructions, due in N days, max score)]
 # Negative days = due date already passed.
 ASSIGNMENTS = {
-    ("SIWES", 1): [
+    1: [
         ("Personal Portfolio Page (HTML Structure)",
          "Build a one-page personal portfolio using semantic HTML (header, nav, main, section, "
          "footer). Include an About section, a Skills list and a Contact section. "
@@ -143,7 +143,7 @@ ASSIGNMENTS = {
          "Add a contact form and write JavaScript that checks the name, email and message "
          "fields before submission. Show friendly error messages.", 5, 30),
     ],
-    ("SIWES", 2): [
+    2: [
         ("Python Basics: Cleaning Rainfall Data",
          "Using Python lists and dictionaries, clean the sample Borno monthly rainfall data "
          "(remove blanks, fix units) and print the average for each year.", -4, 25),
@@ -151,59 +151,33 @@ ASSIGNMENTS = {
          "Load the provided CSV into Pandas, describe the data, find missing values and "
          "create two charts with Matplotlib. Submit a Google Colab or GitHub link.", 6, 25),
     ],
-    ("SIWES", 3): [
+    3: [
         ("Linear Regression: Predicting Crop Yield",
          "Train a linear regression model with scikit-learn on the crop yield dataset, "
-         "report the R-squared score and explain your results in 200 words.", 35, 50),
+         "report the R-squared score and explain your results in 200 words.", 60, 50),
     ],
-    ("SIWES", 4): [
+    4: [
         ("Network Security Audit Report",
          "Perform a basic security audit of a home or office network (password policy, "
-         "router settings, open ports) and write a 2-page report with recommendations.", 63, 50),
-    ],
-    ("NYSC", 1): [
-        ("Semantic HTML5 Page for a Local Business",
-         "Create a web page for a local business in Maiduguri using semantic HTML5 elements. "
-         "Include a header, services list, opening hours table and footer.", -12, 20),
-        ("Corps Member Registration Form",
-         "Build an HTML form that collects a corps member's name, state code, PPA, phone "
-         "and email. Use the correct input types and labels.", -2, 20),
-        ("Accessible Multimedia Page",
-         "Add images, an audio clip and a video to a page with proper alt text, captions "
-         "and keyboard-friendly controls.", 6, 20),
-    ],
-    ("NYSC", 2): [
-        ("Responsive CSS Grid Layout",
-         "Recreate a news homepage layout using CSS Grid that changes from 3 columns on "
-         "desktop to 1 column on phones.", 25, 30),
-    ],
-    ("NYSC", 3): [
-        ("Python Mini Project: Student Grade Calculator",
-         "Write a Python program that reads student scores, calculates averages and grades, "
-         "and prints a neat report.", 50, 40),
-    ],
-    ("NYSC", 4): [
-        ("Flask REST API for a To-Do App",
-         "Build a small Flask API with routes to create, list, update and delete tasks "
-         "stored in SQLite.", 80, 50),
+         "router settings, open ports) and write a 2-page report with recommendations.", 100, 50),
     ],
 }
 
-# Demo submissions: (intern email, programme, course seq, assignment index,
+# Demo submissions: (intern email, course number, assignment index,
 #                    submitted N days ago, score or None, feedback)
 SUBMISSIONS = [
-    ("aisha.goni@student.test", "SIWES", 1, 0, 20, 18, "Excellent use of semantic tags."),
-    ("aisha.goni@student.test", "SIWES", 1, 1, 17, 17, "Clean, responsive layout."),
-    ("aisha.goni@student.test", "SIWES", 1, 2, 16, 26, "Great validation messages."),
-    ("aisha.goni@student.test", "SIWES", 2, 0, 5, 22, "Good data cleaning steps."),
-    ("aisha.goni@student.test", "SIWES", 2, 1, 1, None, None),
-    ("umar.bukar@student.test", "SIWES", 1, 0, 16, 9, "Incomplete - footer and contact section missing."),
-    ("umar.bukar@student.test", "SIWES", 1, 1, 9, None, None),
-    ("hauwa.shettima@student.test", "SIWES", 1, 0, 10, 15, "Good work, submitted late."),
-    ("hauwa.shettima@student.test", "SIWES", 1, 1, 9, None, None),
-    ("chinedu.okafor@corps.test", "NYSC", 1, 0, 13, 17, "Well structured page."),
-    ("chinedu.okafor@corps.test", "NYSC", 1, 1, 1, None, None),
-    ("zainab.lawan@corps.test", "NYSC", 1, 0, 11, None, None),
+    ("aisha.goni@student.test", 1, 0, 20, 18, "Excellent use of semantic tags."),
+    ("aisha.goni@student.test", 1, 1, 17, 17, "Clean, responsive layout."),
+    ("aisha.goni@student.test", 1, 2, 16, 26, "Great validation messages."),
+    ("aisha.goni@student.test", 2, 0, 5, 22, "Good data cleaning steps."),
+    ("aisha.goni@student.test", 2, 1, 1, None, None),
+    ("umar.bukar@student.test", 1, 0, 16, 9, "Incomplete - footer and contact section missing."),
+    ("umar.bukar@student.test", 1, 1, 9, None, None),
+    ("hauwa.shettima@student.test", 1, 0, 10, 15, "Good work, submitted late."),
+    ("hauwa.shettima@student.test", 1, 1, 9, None, None),
+    ("chinedu.okafor@corps.test", 1, 0, 19, 17, "Well structured page."),
+    ("chinedu.okafor@corps.test", 1, 1, 1, None, None),
+    ("zainab.lawan@corps.test", 1, 0, 11, None, None),
 ]
 
 
@@ -219,14 +193,15 @@ def _weekdays(start, end):
         day += timedelta(days=1)
 
 
-def _seed_attendance(intern, progress, profile, rng, marked_by):
+def _seed_attendance(intern, progress, profile, rng):
     """Mark weekday attendance from the course start until yesterday (or the course end)."""
     yesterday = today_wat() - timedelta(days=1)
     last_class_day = min(progress.end_date - timedelta(days=1), yesterday)
     weights = ATTENDANCE_PROFILES[profile]
     for day in _weekdays(progress.start_date, last_class_day):
         status = rng.choices([ATT_PUNCTUAL, ATT_LATE, ATT_ABSENT], weights=weights)[0]
-        mark_attendance(intern, progress.course, day, status, marked_by=marked_by, commit=False)
+        mark_attendance(intern, progress.course, day, status,
+                        marked_by=progress.course.facilitator, commit=False)
 
 
 def _at(day, hour=10, minute=0):
@@ -245,21 +220,17 @@ def seed_database(verbose=True):
 
     today = today_wat()
 
-    # 1. Programmes and courses
+    # 1. Programmes and the shared course track
     programmes = {}
     for p in PROGRAMMES:
         programme = Programme(code=p["code"], name=p["name"],
                               description=p["description"], badge_color=p["badge_color"])
         db.session.add(programme)
-        for order, (title, description, icon) in enumerate(p["courses"], start=1):
-            db.session.add(Course(programme=programme, sequence_order=order,
-                                  code=f"{p['code']}-C{order}", title=title,
-                                  description=description, icon=icon, duration_weeks=4))
         programmes[p["code"]] = programme
-    db.session.flush()
 
-    # 2. Facilitators (each teaches one programme's track)
-    facilitators = {}
+    courses = seed_courses()
+
+    # 2. Facilitators (each is responsible for some courses)
     for f in FACILITATORS:
         facilitator = User(role=ROLE_FACILITATOR, full_name=f["full_name"], email=f["email"].lower(),
                            phone=normalize_phone(f["phone"]), facilitator_id=generate_facilitator_id(),
@@ -267,34 +238,32 @@ def seed_database(verbose=True):
         facilitator.set_password(FACILITATOR_PASSWORD)
         db.session.add(facilitator)
         db.session.flush()
-        for course in programmes[f["teaches"]].courses:
-            course.facilitator = facilitator
-        facilitators[f["teaches"]] = facilitator
+        for order in f["teaches"]:
+            courses[order].facilitator = facilitator
 
-    # 3. Assignments
+    # 3. Assignments (posted by each course's facilitator)
     assignments = {}
-    for (prog_code, seq), items in ASSIGNMENTS.items():
-        course = programmes[prog_code].courses[seq - 1]
+    for order, items in ASSIGNMENTS.items():
+        course = courses[order]
         for index, (title, instructions, due_in_days, max_score) in enumerate(items):
             assignment = Assignment(course=course, title=title, instructions=instructions,
                                     due_date=_at(today + timedelta(days=due_in_days), 23, 59),
-                                    max_score=max_score,
-                                    created_by=facilitators[prog_code],
+                                    max_score=max_score, created_by=course.facilitator,
                                     created_at=_at(today + timedelta(days=due_in_days - 10)))
             db.session.add(assignment)
-            assignments[(prog_code, seq, index)] = assignment
+            assignments[(order, index)] = assignment
     db.session.flush()
 
     # 4. Interns, enrollment, attendance and course results
     interns = {}
     for i in INTERNS:
         programme = programmes[i["programme"]]
-        facilitator = facilitators[i["programme"]]
         start = today - timedelta(days=i["days_ago"])
 
         intern = User(role=ROLE_INTERN, full_name=i["full_name"], email=i["email"].lower(),
                       phone=normalize_phone(i["phone"]), intern_id=generate_intern_id(programme.code),
-                      programme=programme, institution=i["institution"], enrollment_date=start)
+                      programme=programme, institution=i["institution"], department=i["department"],
+                      enrollment_date=start)
         intern.set_password(INTERN_PASSWORD)
         db.session.add(intern)
         db.session.flush()
@@ -302,16 +271,16 @@ def seed_database(verbose=True):
         progress = enroll_intern(intern, start_date=start, commit=False)
         rng = random.Random(2026 + intern.id)   # fixed seed -> same demo data every time
         course1 = progress[0]
-        _seed_attendance(intern, course1, i["attendance"], rng, facilitator)
+        _seed_attendance(intern, course1, i["attendance"], rng)
 
         if i["scenario"] == "passed_c1":
             # Passed Course 1 with 78% at the end of the month -> Course 2 unlocks automatically
-            record_final_result(course1, 78, graded_by=facilitator,
+            record_final_result(course1, 78, graded_by=course1.course.facilitator,
                                 effective_date=course1.end_date, commit=False)
-            _seed_attendance(intern, progress[1], "excellent", rng, facilitator)
+            _seed_attendance(intern, progress[1], "excellent", rng)
         elif i["scenario"] == "failed_c1":
-            # Exactly 50% is NOT above 50% -> FAIL, Course 2 stays locked
-            record_final_result(course1, 50, graded_by=facilitator,
+            # 45% is below the pass mark -> FAIL, Course 2 stays locked
+            record_final_result(course1, 45, graded_by=course1.course.facilitator,
                                 effective_date=course1.end_date, commit=False)
 
         create_notification(intern, f"Welcome to the BICTDA {programme.code} Internship Portal, "
@@ -320,9 +289,9 @@ def seed_database(verbose=True):
         interns[intern.email] = intern
 
     # 5. Submissions and grades
-    for email, prog_code, seq, index, days_ago, score, feedback in SUBMISSIONS:
+    for email, order, index, days_ago, score, feedback in SUBMISSIONS:
         intern = interns[email]
-        assignment = assignments[(prog_code, seq, index)]
+        assignment = assignments[(order, index)]
         submitted_at = _at(today - timedelta(days=days_ago), 14, 30)
         submission = Submission(assignment=assignment, intern=intern,
                                 response_text=f"My submission for '{assignment.title}'. "
@@ -332,7 +301,7 @@ def seed_database(verbose=True):
                                 is_late=submitted_at > assignment.due_date)
         db.session.add(submission)
         if score is not None:
-            grade_submission(submission, score, feedback, graded_by=facilitators[prog_code], commit=False)
+            grade_submission(submission, score, feedback, graded_by=assignment.course.facilitator, commit=False)
 
     db.session.commit()
 
@@ -363,9 +332,12 @@ def _print_summary():
             if p.final_score is not None:
                 label += f"({p.final_score:g}%)"
             parts.append(label)
+        lengths = " + ".join(str(p.duration_weeks // COURSE_DURATION_WEEKS) for p in user.ordered_progress)
+        total = sum(p.duration_weeks for p in user.ordered_progress) // COURSE_DURATION_WEEKS
         current = user.current_progress
         rate = calculate_attendance_rate(user.id, current.course_id) if current else 0
         print(f"  {user.intern_id:<18} {' | '.join(parts)}")
+        print(f"  {'':<18} Track: {lengths} = {total} months")
         if current:
             print(f"  {'':<18} current: {current.course.title} - attendance {rate}%")
     print(line)

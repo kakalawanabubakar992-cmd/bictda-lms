@@ -186,4 +186,55 @@
       showToast("Demo account filled - press Sign In.", "info");
     });
   });
+
+  /* ---------- Charts (Chart.js) ----------
+     Any <canvas data-chart="attendance|doughnut" data-labels='[...]' data-values='[...]'>
+     on a page is drawn automatically - no extra script needed in templates. */
+  function drawChart(canvas) {
+    var labels = JSON.parse(canvas.getAttribute("data-labels") || "[]");
+    var values = JSON.parse(canvas.getAttribute("data-values") || "[]");
+    var font = { family: '"Plus Jakarta Sans", sans-serif' };
+
+    if (canvas.getAttribute("data-chart") === "attendance") {
+      var fill = canvas.getContext("2d").createLinearGradient(0, 0, 0, canvas.clientHeight || 260);
+      fill.addColorStop(0, "rgba(16, 185, 129, 0.30)");
+      fill.addColorStop(1, "rgba(16, 185, 129, 0)");
+      return new Chart(canvas, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: "Attendance %", data: values, fill: true, backgroundColor: fill,
+            borderColor: "#059669", borderWidth: 2.5, tension: 0.35,
+            pointRadius: 3, pointBackgroundColor: "#fff", pointBorderColor: "#059669"
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return " " + c.parsed.y + "%"; } } } },
+          scales: {
+            y: { min: 0, max: 100, ticks: { callback: function (v) { return v + "%"; }, font: font }, grid: { color: "#eef2f7" } },
+            x: { ticks: { font: font, maxRotation: 0, autoSkipPadding: 12 }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    return new Chart(canvas, {   /* doughnut */
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [{ data: values, backgroundColor: ["#10b981", "#3b63f3", "#cbd5e1"], borderWidth: 0, hoverOffset: 6 }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        cutout: "70%",
+        plugins: { legend: { position: "bottom", labels: { usePointStyle: true, padding: 16, font: font } } }
+      }
+    });
+  }
+
+  if (window.Chart) {
+    document.querySelectorAll("canvas[data-chart]").forEach(drawChart);
+  }
 })();

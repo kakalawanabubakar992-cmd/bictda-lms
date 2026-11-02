@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import badge, programme_badge, status_badge, metric_card, progress_bar, avatar %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6">
+
+  <!-- ============ Welcome banner ============ -->
+  <section class="bictda-hero-bg relative overflow-hidden rounded-3xl p-6 text-white shadow-xl sm:p-8">
+    <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <div class="flex items-center gap-4">
+        {{ avatar(current_user, "h-16 w-16", "text-xl") }}
+        <div class="min-w-0">
+          <p class="text-sm text-white/70">Welcome back,</p>
+          <h2 class="truncate text-2xl font-extrabold sm:text-3xl">{{ current_user.full_name }}</h2>
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+            <span class="glass rounded-full px-3 py-1 font-semibold">{{ current_user.intern_id }}</span>
+            {{ programme_badge(current_user.programme.code) }}
+          </div>
+        </div>
+      </div>
+
+      {% if progress %}
+        <div class="glass w-full rounded-2xl p-4 lg:max-w-sm">
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-200">{{ course.order_label }} &middot; Current Course</p>
+            {{ status_badge(progress) }}
+          </div>
+          <p class="mt-1 truncate text-lg font-bold">{{ course.title }}</p>
+          <div class="mt-3">{{ progress_bar(progress.time_progress_percent, "emerald") }}</div>
+          <p class="mt-2 text-xs text-white/70">
+            Week {{ progress.week_number }} of {{ progress.duration_weeks }} ({{ progress.length_label }}) &middot; {{ progress.days_remaining }} days remaining
+          </p>
+        </div>
+      {% else %}
+        <div class="glass rounded-2xl p-4 lg:max-w-sm">
+          <p class="text-lg font-bold"><i class="fa-solid fa-trophy mr-2 text-amber-300"></i>Programme completed!</p>
+          <p class="mt-1 text-sm text-white/70">You have passed all {{ current_user.total_courses_count }} courses.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if progress and progress.is_failed %}
+      <p class="mt-5 rounded-2xl bg-amber-400/15 p-3 text-sm text-amber-100 ring-1 ring-amber-300/30">
+        <i class="fa-solid fa-triangle-exclamation mr-2 text-amber-300"></i>
+        Your final score for this course was <strong class="text-white">{{ progress.final_score|round(1) }}%</strong>.
+        A score of {{ pass_mark }}% or more is required to unlock the next course - retake required.
+      </p>
+    {% endif %}
+  </section>
+
+  <!-- ============ Metric cards ============ -->
+  <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    {{ metric_card("fa-solid fa-book-open", "Current Course",
+                   course.title if course else "All completed",
+                   course.order_label ~ " of " ~ current_user.total_courses_count ~ " · " ~ progress.length_label if course else None, "royal") }}
+    {{ metric_card("fa-solid fa-hourglass-half", "Course Progress",
+                   (progress.time_progress_percent if progress else 100) ~ "%",
+                   ("Week " ~ progress.week_number ~ " of " ~ progress.duration_weeks) if progress else "Finished", "sky") }}
+    {{ metric_card("fa-solid fa-calendar-check", "Attendance",
+                   attendance.rate ~ "%", attendance.label, "emerald") }}
+    {{ metric_card("fa-solid fa-file-pen", "Assignments",
+                   submitted ~ " / " ~ total_assignments, "Submitted this course", "amber") }}
+    {{ metric_card("fa-solid fa-star", "Average Score",
+                   (average_score ~ "%") if average_score is not none else "-", "All graded assignments", "violet") }}
+  </section>
+
+  <!-- ============ Charts ============ -->
+  <section class="grid gap-6 lg:grid-cols-3">
+    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:col-span-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Attendance Trend</h3>
+          <p class="text-xs text-slate-500">Cumulative attendance % for {{ course.title if course else "your course" }}</p>
+        </div>
+        <a href="{{ url_for('intern.attendance') }}" class="text-xs font-semibold text-royal-600 hover:text-royal-700">View log <i class="fa-solid fa-arrow-right ml-1"></i></a>
+      </div>
+      {% if attendance["values"] %}
+        <div class="mt-4 h-64">
+          <canvas data-chart="attendance" data-labels='{{ attendance["labels"]|tojson }}' data-values='{{ attendance["values"]|tojson }}' aria-label="Attendance trend chart"></canvas>
+        </div>
+      {% else %}
+        <p class="mt-10 pb-10 text-center text-sm text-slate-500"><i class="fa-regular fa-calendar mb-2 block text-3xl text-slate-300"></i>No attendance has been marked yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <h3 class="text-base font-bold text-slate-900">Course Overview</h3>
+      <p class="text-xs text-slate-500">{{ current_user.completed_courses_count }} of {{ current_user.total_courses_count }} courses completed</p>
+      <div class="mt-4 h-64">
+        <canvas data-chart="doughnut" data-labels='{{ ["Completed", "Current", "Locked"]|tojson }}' data-values='{{ overview|tojson }}' aria-label="Course overview chart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Upcoming deadlines ============ -->
+  <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h3 class="text-base font-bold text-slate-900">Upcoming Deadlines</h3>
+      <a href="{{ url_for('intern.assignments') }}" class="text-xs font-semibold text-royal-600 hover:text-royal-700">All assignments <i class="fa-solid fa-arrow-right ml-1"></i></a>
+    </div>
+    <ul class="mt-4 divide-y divide-slate-100">
+      {% for assignment, submission in upcoming %}
+        <li class="flex flex-wrap items-center gap-3 py-3">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600"><i class="fa-solid fa-file-lines"></i></span>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-semibold text-slate-800">{{ assignment.title }}</p>
+            <p class="text-xs text-slate-500">Due {{ assignment.due_date|datetime }} &middot; {{ assignment.max_score }} marks</p>
+          </div>
+          {% if submission %}
+            {{ badge(submission.status_label, "emerald" if submission.is_graded else "royal", "fa-solid fa-check") }}
+          {% else %}
+            {{ badge("Not Submitted", "rose", "fa-solid fa-circle-exclamation") }}
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="py-8 text-center text-sm text-slate-500"><i class="fa-regular fa-face-smile mb-2 block text-3xl text-slate-300"></i>No upcoming deadlines.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

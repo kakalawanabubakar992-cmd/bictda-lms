@@ -81,6 +81,11 @@ body { font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system
   color: transparent;
 }
 
+/* Large logo on dark headers: soft white glow + emerald shadow so the emblem stands out */
+.logo-glow {
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.30)) drop-shadow(0 10px 22px rgba(16, 185, 129, 0.40));
+}
+
 /* ---------- App (dashboard) background ---------- */
 .app-bg {
   background-color: #f4f7fb;

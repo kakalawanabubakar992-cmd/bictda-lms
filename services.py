@@ -5,7 +5,7 @@ The important rules of the system are kept here, in plain functions, so they
 are easy to test and to explain in the project report:
 
     1. calculate_attendance_rate()  - punctuality-weighted attendance %
-    2. record_final_result()        - the ">50% unlocks the next course" rule
+    2. record_final_result()        - the "score of PASS_MARK or more unlocks the next course" rule
     3. mark_attendance()            - one record per intern per course per day
     4. submit_assignment() / grade_submission()
     5. ID generators                - BICTDA-SIWES-001, BICTDA-NYSC-001, BICTDA-FAC-001
@@ -18,7 +18,6 @@ from sqlalchemy import func
 from extensions import db
 from models import (
     ATTENDANCE_CREDITS,
-    COURSE_DURATION_DAYS,
     ENROLL_ACTIVE,
     ENROLL_COMPLETED,
     PASS_MARK,
@@ -27,6 +26,7 @@ from models import (
     STATUS_LOCKED,
     STATUS_PASSED,
     Attendance,
+    Course,
     CourseProgress,
     Notification,
     Submission,
@@ -119,10 +119,7 @@ def can_mark_attendance(progress, on_date):
         return False, "You cannot mark attendance for a future date."
     if progress.start_date and on_date < progress.start_date:
         return False, "This date is before the intern started the course."
-    # Active courses must stay inside the 4-week window.
-    # Interns retaking a failed course may be marked after the window.
-    if progress.is_active and progress.end_date and on_date > progress.end_date:
-        return False, "This date is after the 1-month course period."
+    # No end-date check: course durations are expected lengths, not calendar locks.
     return True, ""
 
 
@@ -153,13 +150,14 @@ def mark_attendance(intern, course, on_date, status, marked_by=None, commit=True
 
 
 # ===========================================================================
-# 2. ENROLLMENT & THE >50% SEQUENTIAL UNLOCK RULE
+# 2. ENROLLMENT & THE SEQUENTIAL UNLOCK RULE (score must be PASS_MARK or more)
 # ===========================================================================
 def enroll_intern(intern, start_date=None, commit=True):
     """
-    Create one CourseProgress row for every course in the intern's programme:
-        Course 1 -> ACTIVE (starts on the enrollment date, lasts 28 days)
+    Create one CourseProgress row for every course (SIWES and NYSC share the same track):
+        Course 1 -> ACTIVE (starts on the enrollment date)
         Course 2, 3, 4 -> LOCKED
+    end_date is only the EXPECTED finish date - a course unlocks when the previous one is passed.
     """
     if intern.progress_records:
         return intern.ordered_progress   # already enrolled
@@ -168,12 +166,12 @@ def enroll_intern(intern, start_date=None, commit=True):
     intern.enrollment_date = start
     intern.enrollment_status = ENROLL_ACTIVE
 
-    for course in intern.programme.courses:   # already ordered by sequence_order
+    for course in Course.query.order_by(Course.sequence_order).all():
         progress = CourseProgress(intern=intern, course=course, status=STATUS_LOCKED)
         if course.sequence_order == 1:
             progress.status = STATUS_ACTIVE
             progress.start_date = start
-            progress.end_date = start + timedelta(days=COURSE_DURATION_DAYS)
+            progress.end_date = start + timedelta(days=progress.duration_days)
         db.session.add(progress)
 
     if commit:
@@ -191,8 +189,8 @@ def get_next_progress(progress):
 
 
 def is_passing_score(score):
-    """THE PASS RULE: score must be STRICTLY GREATER than 50. Exactly 50 fails."""
-    return score is not None and float(score) > PASS_MARK
+    """THE PASS RULE: score must be EQUAL TO OR GREATER than PASS_MARK (models.py). Exactly 50 passes."""
+    return score is not None and float(score) >= PASS_MARK
 
 
 def record_final_result(progress, score, graded_by=None, effective_date=None, commit=True):
@@ -201,12 +199,12 @@ def record_final_result(progress, score, graded_by=None, effective_date=None, co
 
     Steps:
       1. Validate the score (0-100). Locked courses cannot be graded.
-      2. Save the score and a snapshot of the 1-month attendance rate.
-      3. If score > 50:
+      2. Save the score and a snapshot of the course attendance rate.
+      3. If score >= PASS_MARK (including exactly 50):
             - this course becomes COMPLETED_PASSED
-            - the NEXT course is automatically unlocked (ACTIVE, starts today, 28 days)
+            - the NEXT course is unlocked immediately (ACTIVE, starts today)
             - if this was the last course, the intern's enrollment becomes "Completed"
-         If score <= 50 (including exactly 50):
+         If score < PASS_MARK:
             - this course becomes COMPLETED_FAILED ("Retake Required")
             - the next course stays LOCKED
             - if the next course had been unlocked by an earlier passing grade
@@ -264,7 +262,7 @@ def record_final_result(progress, score, graded_by=None, effective_date=None, co
                 # >>> AUTOMATIC UNLOCK OF THE NEXT COURSE <<<
                 next_progress.status = STATUS_ACTIVE
                 next_progress.start_date = when
-                next_progress.end_date = when + timedelta(days=COURSE_DURATION_DAYS)
+                next_progress.end_date = when + timedelta(days=next_progress.duration_days)
                 unlocked_course = next_progress.course
             create_notification(
                 intern,
@@ -287,8 +285,8 @@ def record_final_result(progress, score, graded_by=None, effective_date=None, co
 
         create_notification(
             intern,
-            f"Your final result for {course.title} is {score:g}%. A score above "
-            f"{PASS_MARK}% is required to continue - retake required.",
+            f"Your final result for {course.title} is {score:g}%. A score of "
+            f"{PASS_MARK}% or more is required to continue - retake required.",
             link="/courses",
             icon="fa-solid fa-rotate-right",
             commit=False,

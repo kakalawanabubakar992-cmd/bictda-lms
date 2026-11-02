@@ -7,6 +7,7 @@ sign-in. Phase 5 replaces this whole file.
 from flask import Blueprint, render_template
 
 from decorators import facilitator_required
+from models import PASS_MARK
 
 facilitator_bp = Blueprint("facilitator", __name__, url_prefix="/facilitator")
 
@@ -48,7 +49,7 @@ def grading():
 @facilitator_required
 def results():
     return _placeholder("Final Results", "fa-solid fa-award",
-                        "Enter final course results - above 50% unlocks the next course.")
+                        f"Enter final course results - {PASS_MARK}% or more unlocks the next course.")
 
 
 @facilitator_bp.route("/interns")

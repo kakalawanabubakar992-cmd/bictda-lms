@@ -22,6 +22,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from decorators import home_url_for
 from extensions import csrf, db, login_manager
+from models import PASS_MARK
 from utils import now_wat, today_wat
 
 
@@ -87,6 +88,7 @@ def create_app(config_class=Config):
             "current_year": now_wat().year,
             "home_url": home_url_for(current_user),
             "show_demo_logins": app.config["SHOW_DEMO_LOGINS"],
+            "pass_mark": PASS_MARK,
         }
 
     @app.template_filter("date")

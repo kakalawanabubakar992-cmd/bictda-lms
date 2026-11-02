@@ -20,7 +20,7 @@
 
     <!-- ============ Left: branding (desktop & tablet) ============ -->
     <div class="hidden text-white lg:block">
-      <a href="{{ url_for('auth.index') }}">{{ logo(52, true, "lp") }}</a>
+      <a href="{{ url_for('auth.index') }}">{{ logo(88, true, "lp", large=true) }}</a>
       <h1 class="mt-10 text-4xl font-extrabold leading-tight tracking-tight xl:text-5xl">
         {% if is_intern %}Welcome back,<br><span class="text-gradient">future tech leader.</span>
         {% else %}Guide the next<br><span class="text-gradient">generation of talent.</span>{% endif %}
@@ -31,7 +31,7 @@
       </p>
       <ul class="mt-8 space-y-4 text-sm text-white/80">
         {% for icon, text in (
-          [("fa-layer-group", "4 sequential one-month courses"), ("fa-unlock-keyhole", "Next course unlocks above 50%"), ("fa-clock", "Punctual 100% · Late 50% · Absent 0%")]
+          [("fa-layer-group", "4 sequential courses over 6 months"), ("fa-unlock-keyhole", "Next course unlocks at " ~ pass_mark ~ "% or more"), ("fa-clock", "Punctual 100% · Late 50% · Absent 0%")]
           if is_intern else
           [("fa-user-check", "Fast daily attendance marking"), ("fa-file-pen", "Post and grade assignments"), ("fa-award", "Final results trigger automatic unlocks")]
         ) %}
@@ -45,7 +45,7 @@
     <!-- ============ Right: sign-in card ============ -->
     <div class="mx-auto w-full max-w-md fade-up">
       <div class="mb-6 flex justify-center lg:hidden">
-        <a href="{{ url_for('auth.index') }}">{{ logo(46, true, "lm") }}</a>
+        <a href="{{ url_for('auth.index') }}">{{ logo(64, true, "lm", large=true) }}</a>
       </div>
 
       <div class="glass-strong rounded-3xl p-6 sm:p-8">

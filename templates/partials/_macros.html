@@ -1,38 +1,22 @@
 {# =====================================================================
    Reusable UI pieces. Import them in a template with:
-   {% from "partials/_macros.html" import logo, badge, programme_badge, metric_card, progress_bar, avatar %}
+   {% from "partials/_macros.html" import logo, badge, programme_badge, status_badge, metric_card, progress_bar, avatar %}
    ===================================================================== #}
 
-{# ---------- BICTDA SVG logo: hexagon + circuit-style "B" ---------- #}
-{% macro logo(size=40, with_text=true, uid="lg", light=true, subtitle=true) -%}
-<span class="inline-flex items-center gap-3">
-  <svg width="{{ size }}" height="{{ size }}" viewBox="0 0 64 64" role="img" aria-label="BICTDA logo" class="shrink-0 drop-shadow-lg">
-    <defs>
-      <linearGradient id="{{ uid }}-fill" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#3b63f3"/>
-        <stop offset="0.55" stop-color="#2546e0"/>
-        <stop offset="1" stop-color="#10b981"/>
-      </linearGradient>
-      <linearGradient id="{{ uid }}-shine" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
-        <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="M32 3l25 14.5v29L32 61 7 46.5v-29z" fill="url(#{{ uid }}-fill)"/>
-    <path d="M32 3l25 14.5v12L7 29.5v-12z" fill="url(#{{ uid }}-shine)"/>
-    <path d="M32 9.5l19.5 11.25v22.5L32 54.5 12.5 43.25v-22.5z" fill="none" stroke="#fff" stroke-opacity="0.22"/>
-    <!-- circuit-style letter B -->
-    <path d="M23 18v28M23 18h10a7 7 0 0 1 0 14H23M23 32h12a7 7 0 0 1 0 14H23" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M40 25h7M42 39h6" stroke="#a7f3d0" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="48.5" cy="25" r="2.4" fill="#a7f3d0"/>
-    <circle cx="49.5" cy="39" r="2.4" fill="#a7f3d0"/>
-    <circle cx="23" cy="18" r="2.8" fill="#fff"/>
-    <circle cx="23" cy="46" r="2.8" fill="#fff"/>
-  </svg>
+{# ---------- BICTDA official logo (static/icons/bictda-logo.png) ---------- #}
+{% macro logo(size=40, with_text=true, uid="lg", light=true, subtitle=true, large=false) -%}
+<span class="inline-flex items-center {{ 'gap-4' if large else 'gap-3' }}">
+  <img src="{{ url_for('static', filename='icons/bictda-logo.png') }}" alt="BICTDA logo"
+       class="shrink-0 object-contain {{ 'logo-glow' if large else 'drop-shadow-lg' }}" style="height: {{ size }}px; width: auto; max-width: {{ size * 2 }}px;">
   {% if with_text %}
   <span class="sidebar-label leading-tight">
+    {% if large %}
+    <span class="text-gradient block text-2xl font-black tracking-[0.08em] sm:text-4xl sm:tracking-[0.14em]">BICTDA<span class="text-emerald-400">.</span></span>
+    {% if subtitle %}<span class="mt-1 hidden text-sm font-semibold text-white/70 sm:block">Internship &amp; Digital Skills Portal</span>{% endif %}
+    {% else %}
     <span class="block text-lg font-extrabold tracking-tight {{ 'text-white' if light else 'text-slate-900' }}">BICTDA<span class="text-emerald-400">.</span></span>
     {% if subtitle %}<span class="block text-[11px] font-medium {{ 'text-white/60' if light else 'text-slate-500' }}">Internship &amp; Digital Skills Portal</span>{% endif %}
+    {% endif %}
   </span>
   {% endif %}
 </span>
@@ -54,6 +38,18 @@
 {% else %}
   {{ badge(code or "-", "slate") }}
 {% endif %}
+{%- endmacro %}
+
+{# ---------- Course progress status badge (Locked / Active / Passed / Retake) ---------- #}
+{% macro status_badge(progress) -%}
+{% set styles = {
+  "ACTIVE":           ("royal",   "fa-solid fa-play"),
+  "COMPLETED_PASSED": ("emerald", "fa-solid fa-circle-check"),
+  "COMPLETED_FAILED": ("amber",   "fa-solid fa-rotate-right"),
+  "LOCKED":           ("slate",   "fa-solid fa-lock"),
+} %}
+{% set style = styles.get(progress.status, ("slate", None)) %}
+{{ badge(progress.status_label, style[0], style[1]) }}
 {%- endmacro %}
 
 {# ---------- Dashboard metric card ---------- #}
