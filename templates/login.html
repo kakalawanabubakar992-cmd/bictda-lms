@@ -9,6 +9,24 @@
   "phone":     ("Phone Number",    "e.g. 0803 123 4501",           "tel",   "fa-solid fa-phone",     "tel"),
 } %}
 {% set is_intern = portal == "intern" %}
+{% set is_signup = mode == "signup" %}
+
+{# One labelled input with an icon (used by the sign-up forms). toggle=true adds show/hide for passwords. #}
+{% macro field(name, label, icon, type="text", placeholder="", value="", autocomplete="off", inputmode=None, toggle=false) -%}
+<div>
+  <label for="{{ name }}" class="mb-1.5 block text-sm font-semibold text-slate-700">{{ label }}</label>
+  <div class="input-icon-wrap">
+    <i class="{{ icon }} text-slate-400"></i>
+    <input id="{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ value }}" placeholder="{{ placeholder }}" required
+           autocomplete="{{ autocomplete }}"{% if inputmode %} inputmode="{{ inputmode }}"{% endif %}{% if type == "password" %} minlength="8"{% endif %}
+           class="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 {{ 'pr-12' if toggle else 'pr-4' }} text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-royal-500 focus:ring-4 focus:ring-royal-500/15">
+    {% if toggle %}
+      <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:text-slate-600"
+              aria-label="Show password" data-password-toggle="{{ name }}"><i class="fa-regular fa-eye"></i></button>
+    {% endif %}
+  </div>
+</div>
+{%- endmacro %}
 {% set current_ui = method_ui[method] if is_intern else ("Facilitator ID", "e.g. BICTDA-FAC-001", "text", "fa-solid fa-id-badge", "text") %}
 
 {% block public %}
@@ -51,22 +69,79 @@
       <div class="glass-strong rounded-3xl p-6 sm:p-8">
         <!-- Portal switch -->
         <div class="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 text-sm font-semibold">
-          <a href="{{ url_for('auth.login_intern', next=request.args.get('next')) }}"
+          <a href="{{ url_for('auth.register_intern_page') if is_signup else url_for('auth.login_intern', next=request.args.get('next')) }}"
              class="flex items-center justify-center gap-2 rounded-xl py-2.5 transition {{ 'bg-white text-royal-700 shadow' if is_intern else 'text-slate-500 hover:text-slate-700' }}">
             <i class="fa-solid fa-user-graduate"></i> Intern
           </a>
-          <a href="{{ url_for('auth.login_facilitator', next=request.args.get('next')) }}"
+          <a href="{{ url_for('auth.register_facilitator_page') if is_signup else url_for('auth.login_facilitator', next=request.args.get('next')) }}"
              class="flex items-center justify-center gap-2 rounded-xl py-2.5 transition {{ 'bg-white text-royal-700 shadow' if not is_intern else 'text-slate-500 hover:text-slate-700' }}">
             <i class="fa-solid fa-chalkboard-user"></i> Facilitator
           </a>
         </div>
 
         <div class="mt-6">
-          <h2 class="text-2xl font-extrabold text-slate-900">{{ "Intern Sign In" if is_intern else "Facilitator Sign In" }}</h2>
+          <h2 class="text-2xl font-extrabold text-slate-900">{{ title }}</h2>
           <p class="mt-1 text-sm text-slate-500">
-            {{ "Use your email, Intern ID or phone number." if is_intern else "Use your BICTDA Facilitator ID." }}
+            {% if is_signup %}
+              {{ "Create your intern account - your BICTDA Intern ID is generated automatically." if is_intern
+                 else "Use the Facilitator ID issued to you by BICTDA and choose the courses you offer." }}
+            {% else %}
+              {{ "Use your email, Intern ID or phone number." if is_intern else "Use your BICTDA Facilitator ID." }}
+            {% endif %}
           </p>
         </div>
+
+        {% if is_signup %}
+        <!-- ============ Sign-up form ============ -->
+        <form method="post" class="mt-6 space-y-4"
+              action="{{ url_for('auth.register_intern_page' if is_intern else 'auth.register_facilitator_page') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          {% if is_intern %}
+            {{ field("full_name", "Full Name", "fa-solid fa-user", placeholder="e.g. Aisha Mohammed Goni", value=form.get("full_name", ""), autocomplete="name") }}
+            {{ field("email", "Email Address", "fa-solid fa-envelope", "email", "you@example.com", form.get("email", ""), "email", "email") }}
+            {{ field("phone", "Phone Number", "fa-solid fa-phone", "tel", "e.g. 0803 123 4567", form.get("phone", ""), "tel", "tel") }}
+            <fieldset>
+              <legend class="mb-1.5 block text-sm font-semibold text-slate-700">Programme</legend>
+              <div class="grid grid-cols-2 gap-2">
+                {% for p in programmes %}
+                  <label class="cursor-pointer">
+                    <input type="radio" name="programme" value="{{ p.code }}" class="peer sr-only" required {{ "checked" if form.get("programme") == p.code }}>
+                    <span class="flex flex-col items-center rounded-xl border border-slate-200 px-2 py-2.5 text-center text-[11px] text-slate-500 transition hover:border-slate-300
+                                 peer-checked:border-royal-500 peer-checked:bg-royal-50 peer-checked:text-royal-700">
+                      <span class="text-sm font-bold">{{ p.code }}</span>{{ "Student on industrial training" if p.code == "SIWES" else "Corps member" }}
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
+            </fieldset>
+          {% else %}
+            {{ field("facilitator_id", "BICTDA Facilitator ID", "fa-solid fa-id-badge", placeholder="e.g. BICTDA-FAC-003", value=form.get("facilitator_id", ""), autocomplete="username") }}
+            <fieldset>
+              <legend class="mb-1.5 block text-sm font-semibold text-slate-700">Courses you will facilitate</legend>
+              <div class="grid gap-2 sm:grid-cols-2">
+                {% for c in courses %}
+                  <label class="cursor-pointer">
+                    <input type="checkbox" name="courses" value="{{ c.id }}" class="peer sr-only" {{ "checked" if c.id|string in form.getlist("courses") }}>
+                    <span class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300
+                                 peer-checked:border-royal-500 peer-checked:bg-royal-50 peer-checked:text-royal-700">
+                      <i class="{{ c.icon }}"></i><span>{{ c.title }}<span class="block text-[10px] font-medium opacity-70">{{ c.order_label }} &middot; {{ c.length_label }}</span></span>
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
+            </fieldset>
+          {% endif %}
+
+          {{ field("password", "Create Password", "fa-solid fa-lock", "password", "At least 8 characters", autocomplete="new-password", toggle=true) }}
+          {{ field("confirm_password", "Confirm Password", "fa-solid fa-lock", "password", "Type the password again", autocomplete="new-password", toggle=true) }}
+
+          <button type="submit" class="btn-primary w-full py-3.5"><i class="fa-solid fa-user-plus"></i> Create Account</button>
+          {% if not is_intern %}
+            <p class="text-xs text-slate-500">No Facilitator ID yet? Ask the BICTDA admin to issue one.</p>
+          {% endif %}
+        </form>
+        {% else %}
 
         <form method="post" class="mt-6 space-y-5" novalidate
               action="{{ url_for('auth.login_intern' if is_intern else 'auth.login_facilitator', next=request.args.get('next')) }}">
@@ -153,6 +228,18 @@
             </div>
           </details>
         {% endif %}
+        {% endif %}
+
+        <!-- Switch between sign in and sign up -->
+        <p class="mt-6 text-center text-sm text-slate-600">
+          {% if is_signup %}
+            Already have an account?
+            <a href="{{ url_for('auth.login_intern' if is_intern else 'auth.login_facilitator') }}" class="font-semibold text-royal-600 hover:text-royal-700">Sign in</a>
+          {% else %}
+            New here?
+            <a href="{{ url_for('auth.register_intern_page' if is_intern else 'auth.register_facilitator_page') }}" class="font-semibold text-royal-600 hover:text-royal-700">Create an account</a>
+          {% endif %}
+        </p>
       </div>
 
       <p class="mt-6 text-center text-sm text-white/70">

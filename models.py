@@ -4,6 +4,8 @@ models.py - Database models (tables) for BICTDA LMS.
 Tables:
     programmes        SIWES and NYSC
     users             Interns AND Facilitators (one table, separated by "role")
+    issued_facilitator_ids  Facilitator IDs issued by BICTDA (needed to sign up as a facilitator)
+    facilitator_courses     Which courses each facilitator offers (a course can have several)
     courses           4 sequential courses shared by SIWES and NYSC (6 months in total)
     course_progress   One row per intern per course (LOCKED / ACTIVE / PASSED / FAILED)
     attendance        Daily attendance with punctuality credit (100 / 50 / 0)
@@ -65,6 +67,14 @@ def months_label(weeks):
     return f"{months} month{'s' if months != 1 else ''}"
 
 
+# Link table: facilitator <-> courses they offer (many-to-many)
+facilitator_courses = db.Table(
+    "facilitator_courses",
+    db.Column("user_id", db.Integer, db.ForeignKey("users.id"), primary_key=True),
+    db.Column("course_id", db.Integer, db.ForeignKey("courses.id"), primary_key=True),
+)
+
+
 # ---------------------------------------------------------------------------
 # Programme (SIWES / NYSC)
 # ---------------------------------------------------------------------------
@@ -92,7 +102,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     role = db.Column(db.String(20), nullable=False, index=True)    # intern / facilitator
     full_name = db.Column(db.String(120), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, index=True)      # interns only (facilitators use their ID)
     phone = db.Column(db.String(20), unique=True, index=True)       # stored as +234...
     password_hash = db.Column(db.String(255), nullable=False)
 
@@ -120,7 +130,9 @@ class User(UserMixin, db.Model):
         foreign_keys="CourseProgress.intern_id",
         cascade="all, delete-orphan",
     )
-    taught_courses = db.relationship("Course", back_populates="facilitator")
+    taught_courses = db.relationship(
+        "Course", secondary=facilitator_courses, back_populates="facilitators", order_by="Course.sequence_order"
+    )
     attendance_records = db.relationship(
         "Attendance",
         back_populates="intern",
@@ -221,6 +233,21 @@ def load_user(user_id):
 
 
 # ---------------------------------------------------------------------------
+# Facilitator IDs issued by BICTDA (the admin adds them in seed.py -> ISSUED_FACILITATOR_IDS)
+# ---------------------------------------------------------------------------
+class IssuedFacilitatorID(db.Model):
+    __tablename__ = "issued_facilitator_ids"
+
+    id = db.Column(db.Integer, primary_key=True)
+    facilitator_id = db.Column(db.String(30), unique=True, nullable=False)   # e.g. BICTDA-FAC-003
+    full_name = db.Column(db.String(120))                                   # becomes the account name
+    created_at = db.Column(db.DateTime, default=now_wat)
+
+    def __repr__(self):
+        return f"<IssuedFacilitatorID {self.facilitator_id}>"
+
+
+# ---------------------------------------------------------------------------
 # Course
 # ---------------------------------------------------------------------------
 class Course(db.Model):
@@ -233,9 +260,8 @@ class Course(db.Model):
     description = db.Column(db.Text)
     duration_weeks = db.Column(db.Integer, default=COURSE_DURATION_WEEKS)  # expected length (1 month = 4 weeks)
     icon = db.Column(db.String(50), default="fa-solid fa-book-open")  # Font Awesome classes
-    facilitator_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
-    facilitator = db.relationship("User", back_populates="taught_courses")
+    facilitators = db.relationship("User", secondary=facilitator_courses, back_populates="taught_courses")
     progress_records = db.relationship("CourseProgress", back_populates="course")
     assignments = db.relationship(
         "Assignment",
@@ -243,6 +269,11 @@ class Course(db.Model):
         cascade="all, delete-orphan",
         order_by="Assignment.due_date",
     )
+
+    @property
+    def facilitator(self):
+        """The first facilitator offering this course (or None)."""
+        return self.facilitators[0] if self.facilitators else None
 
     @property
     def order_label(self):

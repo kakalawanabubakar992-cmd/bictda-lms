@@ -69,13 +69,14 @@ def create_app(config_class=Config):
     # ----- Database tables + demo data
     with app.app_context():
         db.create_all()
-        if app.config["AUTO_SEED"]:
-            from seed import seed_database
-            try:
+        from seed import seed_database, seed_issued_ids
+        try:
+            if app.config["AUTO_SEED"]:
                 seed_database(verbose=True)
-            except IntegrityError:
-                # Another server process seeded at the same moment - safe to ignore
-                db.session.rollback()
+            seed_issued_ids()          # Facilitator IDs the admin added to seed.py since the last start
+        except IntegrityError:
+            # Another server process seeded at the same moment - safe to ignore
+            db.session.rollback()
 
     # ----- Template helpers
     @app.context_processor

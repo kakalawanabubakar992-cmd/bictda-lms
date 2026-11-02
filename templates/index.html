@@ -48,6 +48,10 @@
           <i class="fa-solid fa-chalkboard-user"></i> Facilitator Sign In
         </a>
       </div>
+      <p class="mt-4 text-sm text-white/70">
+        New intern? <a href="{{ url_for('auth.register_intern_page') }}" class="font-semibold text-emerald-300 hover:text-emerald-200">Create your account</a>
+        &middot; Facilitator with a BICTDA ID? <a href="{{ url_for('auth.register_facilitator_page') }}" class="font-semibold text-emerald-300 hover:text-emerald-200">Sign up here</a>
+      </p>
       <dl class="mt-10 grid max-w-lg grid-cols-3 gap-4">
         <div><dt class="text-xs text-white/55">Interns</dt><dd class="text-2xl font-extrabold">{{ stats.interns }}</dd></div>
         <div><dt class="text-xs text-white/55">Courses</dt><dd class="text-2xl font-extrabold">{{ stats.courses }}</dd></div>

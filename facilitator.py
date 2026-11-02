@@ -6,8 +6,9 @@ facilitator.py - Facilitator portal.
     /facilitator/assignments   post assignments and see submission counts
     /facilitator/grading       grade intern submissions
     /facilitator/interns       intern list + final course results (a pass unlocks the next course)
+    /facilitator/courses       change the courses this facilitator offers
 
-Every facilitator can manage every course; their own courses are pre-selected.
+A facilitator only sees and manages the courses they chose (current_user.taught_courses).
 All business rules live in services.py - these routes only collect input and show results.
 """
 from datetime import datetime
@@ -45,6 +46,7 @@ from services import (
     mark_attendance,
     post_assignment,
     record_final_result,
+    set_facilitator_courses,
 )
 from utils import today_wat
 
@@ -61,15 +63,19 @@ ATTENDANCE_OPTIONS = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _all_courses():
-    return Course.query.order_by(Course.sequence_order).all()
+def _my_courses():
+    """The courses this facilitator offers, Course 1 -> 4."""
+    return current_user.taught_courses
+
+
+def _my_course_ids():
+    return [c.id for c in _my_courses()]
 
 
 def _selected_course(courses):
-    """Course from ?course=<id>, otherwise the facilitator's own first course, otherwise Course 1."""
+    """Course from ?course=<id> if it is one of the facilitator's courses, otherwise their first course."""
     requested = request.values.get("course", type=int)
-    mine = [c for c in courses if c.facilitator_id == current_user.id]
-    return next((c for c in courses if c.id == requested), None) or (mine or courses or [None])[0]
+    return next((c for c in courses if c.id == requested), None) or (courses[0] if courses else None)
 
 
 def _average_score(intern, course):
@@ -89,8 +95,9 @@ def _back(default_endpoint, **values):
 @facilitator_bp.route("/dashboard")
 @facilitator_required
 def dashboard():
-    courses = _all_courses()
-    rows = CourseProgress.query.all()
+    courses = _my_courses()
+    ids = _my_course_ids()
+    rows = CourseProgress.query.filter(CourseProgress.course_id.in_(ids)).all()
 
     def count(course, statuses):
         return sum(1 for p in rows if p.course_id == course.id and p.status in statuses)
@@ -105,13 +112,14 @@ def dashboard():
         ],
     }
     today_avg, today_count = (db.session.query(func.avg(Attendance.credit), func.count(Attendance.id))
-                              .filter(Attendance.date == today_wat()).one())
-    pending = Submission.query.filter(Submission.score.is_(None)).order_by(Submission.submitted_at).all()
+                              .filter(Attendance.date == today_wat(), Attendance.course_id.in_(ids)).one())
+    pending = (Submission.query.join(Submission.assignment).filter(Submission.score.is_(None), Assignment.course_id.in_(ids))
+               .order_by(Submission.submitted_at).all())
 
     return render_template(
         "facilitator/dashboard.html",
         title="Facilitator Dashboard",
-        total_interns=User.query.filter_by(role=ROLE_INTERN).count(),
+        all_courses=Course.query.order_by(Course.sequence_order).all(),
         course_counts=list(zip(courses, current)),
         today_rate=round(float(today_avg), 1) if today_count else None,
         today_count=today_count,
@@ -120,13 +128,25 @@ def dashboard():
     )
 
 
+@facilitator_bp.route("/courses", methods=["POST"])
+@facilitator_required
+def update_courses():
+    """Change the courses this facilitator offers (at least one)."""
+    try:
+        set_facilitator_courses(current_user, request.form.getlist("courses"))
+        flash("Your courses have been updated.", "success")
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("facilitator.dashboard"))
+
+
 # ---------------------------------------------------------------------------
 # Attendance
 # ---------------------------------------------------------------------------
 @facilitator_bp.route("/attendance", methods=["GET", "POST"])
 @facilitator_required
 def attendance():
-    courses = _all_courses()
+    courses = _my_courses()
     course = _selected_course(courses)
     try:
         on_date = datetime.strptime(request.values.get("date", ""), "%Y-%m-%d").date()
@@ -168,9 +188,9 @@ def attendance():
 @facilitator_bp.route("/assignments", methods=["GET", "POST"])
 @facilitator_required
 def assignments():
-    courses = _all_courses()
+    courses = _my_courses()
     if request.method == "POST":
-        course = db.session.get(Course, request.form.get("course", type=int) or 0)
+        course = _selected_course(courses) if request.form.get("course", type=int) in _my_course_ids() else None
         try:
             post_assignment(course, request.form.get("title"), request.form.get("instructions"),
                             request.form.get("due_date"), request.form.get("max_score"), created_by=current_user)
@@ -193,7 +213,7 @@ def grading():
     assignment_id = request.args.get("assignment", type=int)
     status = request.args.get("status", "pending")
 
-    query = Submission.query.join(Submission.assignment)
+    query = Submission.query.join(Submission.assignment).filter(Assignment.course_id.in_(_my_course_ids()))
     if assignment_id:
         query = query.filter(Submission.assignment_id == assignment_id)
     elif course_id:
@@ -203,7 +223,7 @@ def grading():
     elif status == "graded":
         query = query.filter(Submission.score.isnot(None))
 
-    return render_template("facilitator/grading.html", title="Grade Submissions", courses=_all_courses(),
+    return render_template("facilitator/grading.html", title="Grade Submissions", courses=_my_courses(),
                            submissions=query.order_by(Submission.submitted_at).all(),
                            course_id=course_id, assignment_id=assignment_id, status=status)
 
@@ -212,6 +232,8 @@ def grading():
 @facilitator_required
 def grade(submission_id):
     submission = db.session.get(Submission, submission_id) or abort(404)
+    if submission.assignment.course_id not in _my_course_ids():
+        abort(404)                                    # not one of this facilitator's courses
     try:
         grade_submission(submission, request.form.get("score"), request.form.get("feedback"), graded_by=current_user)
         flash(f"Grade saved for {submission.intern.full_name}.", "success")
@@ -228,7 +250,7 @@ def grade(submission_id):
 def interns():
     programme = request.args.get("programme", "")
     course_id = request.args.get("course", type=int)
-    status = request.args.get("status", "")          # active / retake / completed
+    status = request.args.get("status", "")          # active / retake
     search = request.args.get("q", "").strip()
 
     query = User.query.filter_by(role=ROLE_INTERN)
@@ -238,25 +260,24 @@ def interns():
         like = f"%{search}%"
         query = query.filter(or_(User.full_name.ilike(like), User.intern_id.ilike(like), User.email.ilike(like)))
 
+    my_ids = _my_course_ids()
     rows = []
     for intern in query.order_by(User.intern_id).all():
-        progress = intern.current_progress
-        if course_id and (progress is None or progress.course_id != course_id):
+        progress = intern.current_progress            # only interns currently in one of my courses
+        if progress is None or progress.course_id not in my_ids or (course_id and progress.course_id != course_id):
             continue
-        if (status == "active" and not (progress and progress.is_active)) or \
-           (status == "retake" and not (progress and progress.is_failed)) or \
-           (status == "completed" and progress is not None):
+        if (status == "active" and not progress.is_active) or (status == "retake" and not progress.is_failed):
             continue
-        next_progress = get_next_progress(progress) if progress else None
+        next_progress = get_next_progress(progress)
         rows.append({
             "intern": intern,
             "progress": progress,
-            "average": _average_score(intern, progress.course) if progress else None,
+            "average": _average_score(intern, progress.course),
             "next_course": next_progress.course if next_progress else None,
         })
 
     return render_template("facilitator/interns.html", title="Interns & Results", rows=rows,
-                           programmes=Programme.query.order_by(Programme.id).all(), courses=_all_courses(),
+                           programmes=Programme.query.order_by(Programme.id).all(), courses=_my_courses(),
                            filters={"programme": programme, "course": course_id, "status": status, "q": search})
 
 
@@ -265,6 +286,8 @@ def interns():
 def save_result(progress_id):
     """Save a final course result. services.record_final_result applies the pass mark and unlocks the next course."""
     progress = db.session.get(CourseProgress, progress_id) or abort(404)
+    if progress.course_id not in _my_course_ids():
+        abort(404)                                    # not one of this facilitator's courses
     try:
         outcome = record_final_result(progress, request.form.get("score"), graded_by=current_user)
         name, course = progress.intern.full_name, progress.course.title

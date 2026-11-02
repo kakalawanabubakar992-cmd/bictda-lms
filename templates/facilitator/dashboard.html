@@ -14,19 +14,37 @@
         <p class="mt-1 text-sm text-white/70">{{ current_user.facilitator_id }} &middot; {{ current_user.specialization or "Facilitator" }}</p>
       </div>
     </div>
-    {% if current_user.taught_courses %}
-      <div class="mt-5 flex flex-wrap gap-2">
-        {% for course in current_user.taught_courses|sort(attribute="sequence_order") %}
-          <span class="glass rounded-full px-3 py-1 text-xs font-semibold"><i class="{{ course.icon }} mr-1.5 text-emerald-300"></i>{{ course.title }}</span>
+    <div class="mt-5 flex flex-wrap gap-2">
+      {% for course in current_user.taught_courses %}
+        <span class="glass rounded-full px-3 py-1 text-xs font-semibold"><i class="{{ course.icon }} mr-1.5 text-emerald-300"></i>{{ course.title }}</span>
+      {% endfor %}
+    </div>
+
+    <!-- Change the courses I offer -->
+    <details class="group mt-4">
+      <summary class="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-emerald-200 hover:text-white">
+        <i class="fa-solid fa-pen-to-square"></i>Change my courses
+        <i class="fa-solid fa-chevron-down text-xs transition group-open:rotate-180"></i>
+      </summary>
+      <form method="post" action="{{ url_for('facilitator.update_courses') }}" class="mt-3 flex flex-wrap items-center gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for c in all_courses %}
+          <label class="cursor-pointer">
+            <input type="checkbox" name="courses" value="{{ c.id }}" class="peer sr-only" {{ "checked" if c in current_user.taught_courses }}>
+            <span class="glass inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-white/70 transition peer-checked:bg-emerald-400 peer-checked:text-emerald-950">
+              <i class="{{ c.icon }}"></i>{{ c.title }}
+            </span>
+          </label>
         {% endfor %}
-      </div>
-    {% endif %}
+        <button type="submit" class="rounded-full bg-white px-4 py-1.5 text-xs font-bold text-royal-950 hover:bg-emerald-50">Save</button>
+      </form>
+    </details>
   </section>
 
   <!-- ============ Metric cards ============ -->
   <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    {{ metric_card("fa-solid fa-users", "Total Interns", total_interns, "SIWES and NYSC", "royal") }}
-    {{ metric_card("fa-solid fa-user-graduate", "Active Interns", course_counts|sum(attribute=1), "Currently taking a course", "sky") }}
+    {{ metric_card("fa-solid fa-layer-group", "My Courses", course_counts|length, "Courses you offer", "royal") }}
+    {{ metric_card("fa-solid fa-user-graduate", "My Interns", course_counts|sum(attribute=1), "Currently in your courses", "sky") }}
     {{ metric_card("fa-solid fa-calendar-check", "Today's Attendance",
                    (today_rate ~ "%") if today_rate is not none else "Not marked",
                    today_count ~ " record" ~ ("s" if today_count != 1 else "") ~ " today", "emerald") }}
@@ -37,7 +55,7 @@
   <section class="grid gap-6 lg:grid-cols-3">
     <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:col-span-2">
       <h3 class="text-base font-bold text-slate-900">Course Progress</h3>
-      <p class="text-xs text-slate-500">Interns per course by status</p>
+      <p class="text-xs text-slate-500">Interns in your courses by status</p>
       <div class="mt-4 h-72">
         <canvas data-chart="stacked" data-labels='{{ chart.labels|tojson }}' data-series='{{ chart.series|tojson }}' aria-label="Course progress chart"></canvas>
       </div>
@@ -51,7 +69,7 @@
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-royal-50 text-royal-600"><i class="{{ course.icon }}"></i></span>
             <div class="min-w-0 flex-1">
               <p class="truncate text-sm font-semibold text-slate-800">{{ course.title }}</p>
-              <p class="text-xs text-slate-500">{{ course.order_label }} &middot; {{ course.length_label }}{% if course.facilitator_id == current_user.id %} &middot; <span class="font-semibold text-emerald-600">Yours</span>{% endif %}</p>
+              <p class="text-xs text-slate-500">{{ course.order_label }} &middot; {{ course.length_label }}</p>
             </div>
             <a href="{{ url_for('facilitator.attendance', course=course.id) }}" class="text-right" title="Mark attendance">
               <span class="block text-lg font-extrabold text-slate-900">{{ count }}</span>

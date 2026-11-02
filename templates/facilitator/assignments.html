@@ -13,7 +13,7 @@
         <label for="new-course" class="form-label">Course</label>
         <select id="new-course" name="course" class="form-input" required>
           {% for c in courses %}
-            <option value="{{ c.id }}" {{ "selected" if (form.get("course")|int(0) or course.id) == c.id }}>{{ c.order_label }}: {{ c.title }}{{ " (yours)" if c.facilitator_id == current_user.id }}</option>
+            <option value="{{ c.id }}" {{ "selected" if (form.get("course")|int(0) or course.id) == c.id }}>{{ c.order_label }}: {{ c.title }}</option>
           {% endfor %}
         </select>
       </div>

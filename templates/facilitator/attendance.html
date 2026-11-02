@@ -10,7 +10,7 @@
       <label for="course" class="form-label">Course</label>
       <select id="course" name="course" class="form-input">
         {% for c in courses %}
-          <option value="{{ c.id }}" {{ "selected" if course and c.id == course.id }}>{{ c.order_label }}: {{ c.title }}{{ " (yours)" if c.facilitator_id == current_user.id }}</option>
+          <option value="{{ c.id }}" {{ "selected" if course and c.id == course.id }}>{{ c.order_label }}: {{ c.title }}</option>
         {% endfor %}
       </select>
     </div>

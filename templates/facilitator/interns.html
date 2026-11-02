@@ -27,7 +27,7 @@
     <div>
       <label for="status" class="form-label">Status</label>
       <select id="status" name="status" class="form-input">
-        {% for value, label in [("", "All"), ("active", "Active"), ("retake", "Retake required"), ("completed", "Completed")] %}
+        {% for value, label in [("", "All"), ("active", "Active"), ("retake", "Retake required")] %}
           <option value="{{ value }}" {{ "selected" if value == filters.status }}>{{ label }}</option>
         {% endfor %}
       </select>

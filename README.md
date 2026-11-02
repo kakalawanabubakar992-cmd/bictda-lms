@@ -6,6 +6,10 @@ NYSC corps members.
 
 ## Features
 - Two sign-in portals: Interns (sign in with email, Intern ID or phone) and Facilitators (Facilitator ID)
+- Sign up: interns register with full name, email, phone, programme and password (email and phone must be unique);
+  facilitators register with a BICTDA-issued Facilitator ID, a password and the courses they offer
+- Facilitators only see and manage the interns, attendance, assignments and grades of their own courses
+- Passwords are always stored hashed (Werkzeug)
 - SIWES and NYSC programmes with auto-generated IDs (`BICTDA-SIWES-001`, `BICTDA-NYSC-001`)
 - One 6-month track of 4 courses for SIWES and NYSC, taken in order. The next course unlocks only when the final score is **50% or more**
 - Attendance with punctuality credit: Punctual 100%, Late 50%, Absent 0%
@@ -45,5 +49,10 @@ python seed.py                       # creates bictda_lms.db with demo data
 | SIWES Intern | BICTDA-SIWES-003 | Intern@123 |
 | NYSC Intern | BICTDA-NYSC-001 | Intern@123 |
 | NYSC Intern | BICTDA-NYSC-002 | Intern@123 |
+
+## Facilitator IDs
+BICTDA issues Facilitator IDs. The admin adds them in one place: `ISSUED_FACILITATOR_IDS` in `seed.py`.
+New IDs are saved to the database the next time the app starts. Each ID can be used to sign up only once.
+`BICTDA-FAC-003`, `BICTDA-FAC-004` and `BICTDA-FAC-005` are free for testing the facilitator Sign Up page.
 
 Final-year Software Engineering project.

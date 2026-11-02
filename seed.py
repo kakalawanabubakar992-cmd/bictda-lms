@@ -20,10 +20,10 @@ from models import (
     COURSE_DURATION_WEEKS,
     DEPT_CYBERSECURITY,
     DEPT_SOFTWARE_DATA,
-    ROLE_FACILITATOR,
     ROLE_INTERN,
     Assignment,
     Course,
+    IssuedFacilitatorID,
     Programme,
     Submission,
     User,
@@ -32,11 +32,11 @@ from services import (
     calculate_attendance_rate,
     create_notification,
     enroll_intern,
-    generate_facilitator_id,
     generate_intern_id,
     grade_submission,
     mark_attendance,
     record_final_result,
+    register_facilitator,
 )
 from utils import normalize_phone, today_wat
 
@@ -90,12 +90,39 @@ def seed_courses():
     db.session.flush()
     return courses
 
-# teaches: course numbers (sequence_order) this facilitator is responsible for
+# ---------------------------------------------------------------------------
+# FACILITATOR IDS ISSUED BY BICTDA - the admin adds new IDs here (one place).
+# A facilitator can only sign up with an ID from this list, and each ID only once.
+# New IDs are added to the database every time the app starts.
+#   (Facilitator ID, full name shown on their account)
+# ---------------------------------------------------------------------------
+ISSUED_FACILITATOR_IDS = [
+    ("BICTDA-FAC-001", "Engr. Babagana Modu"),
+    ("BICTDA-FAC-002", "Mrs. Fatima Bukar Kyari"),
+    ("BICTDA-FAC-003", "Dr. Musa Ibrahim Kolo"),
+    ("BICTDA-FAC-004", "Mal. Yakubu Ali Gana"),
+    ("BICTDA-FAC-005", "Hajiya Aisha Umar Bulama"),
+]
+
+
+def seed_issued_ids():
+    """Add any ID from ISSUED_FACILITATOR_IDS that is not in the database yet. Returns how many were added."""
+    existing = {row.facilitator_id for row in IssuedFacilitatorID.query.all()}
+    new_ids = [(fid, name) for fid, name in ISSUED_FACILITATOR_IDS if fid not in existing]
+    for fid, name in new_ids:
+        db.session.add(IssuedFacilitatorID(facilitator_id=fid, full_name=name))
+    if new_ids:
+        db.session.commit()
+    return len(new_ids)
+
+
+# Demo facilitator accounts (already signed up). BICTDA-FAC-003 to 005 are left free to test sign-up.
+#   teaches: course numbers (sequence_order) this facilitator offers
 FACILITATORS = [
-    {"full_name": "Engr. Babagana Modu", "email": "babagana.modu@bictda.test",
-     "phone": "08031110001", "specialization": "Data Science & Machine Learning", "teaches": [2, 3]},
-    {"full_name": "Mrs. Fatima Bukar Kyari", "email": "fatima.kyari@bictda.test",
-     "phone": "08031110002", "specialization": "Web Development & Cybersecurity", "teaches": [1, 4]},
+    {"facilitator_id": "BICTDA-FAC-001", "phone": "08031110001",
+     "specialization": "Data Science & Machine Learning", "teaches": [2, 3]},
+    {"facilitator_id": "BICTDA-FAC-002", "phone": "08031110002",
+     "specialization": "Web Development & Cybersecurity", "teaches": [1, 4]},
 ]
 
 # scenario: what has happened to this intern so far
@@ -230,16 +257,14 @@ def seed_database(verbose=True):
 
     courses = seed_courses()
 
-    # 2. Facilitators (each is responsible for some courses)
+    # 2. Facilitators - signed up through the same function as the Sign Up page
+    seed_issued_ids()
     for f in FACILITATORS:
-        facilitator = User(role=ROLE_FACILITATOR, full_name=f["full_name"], email=f["email"].lower(),
-                           phone=normalize_phone(f["phone"]), facilitator_id=generate_facilitator_id(),
-                           specialization=f["specialization"])
-        facilitator.set_password(FACILITATOR_PASSWORD)
-        db.session.add(facilitator)
-        db.session.flush()
-        for order in f["teaches"]:
-            courses[order].facilitator = facilitator
+        facilitator = register_facilitator(f["facilitator_id"], FACILITATOR_PASSWORD, FACILITATOR_PASSWORD,
+                                           [courses[order].id for order in f["teaches"]], commit=False)
+        facilitator.phone = normalize_phone(f["phone"])
+        facilitator.specialization = f["specialization"]
+    db.session.flush()
 
     # 3. Assignments (posted by each course's facilitator)
     assignments = {}
@@ -323,6 +348,9 @@ def _print_summary():
         print(f" {role:<13}{user.login_id:<20}{user.full_name[:25]:<27}{password}")
     print("-" * 78)
     print(" Interns can also sign in with their email or phone, e.g. 08031234501")
+    used = {u.facilitator_id for u in User.query.filter(User.facilitator_id.isnot(None))}
+    free = [fid for fid, _ in ISSUED_FACILITATOR_IDS if fid not in used]
+    print(f" Free Facilitator IDs for testing Sign Up: {', '.join(free) or 'none'}")
     print(line)
     print(" BUSINESS RULE CHECK")
     for user in User.query.filter_by(role=ROLE_INTERN).order_by(User.id).all():

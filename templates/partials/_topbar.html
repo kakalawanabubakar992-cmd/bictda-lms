@@ -70,7 +70,7 @@
       <div class="absolute right-0 mt-2 hidden w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" data-dropdown-menu>
         <div class="border-b border-slate-100 p-4">
           <p class="truncate text-sm font-bold text-slate-900">{{ current_user.full_name }}</p>
-          <p class="truncate text-xs text-slate-500">{{ current_user.email }}</p>
+          <p class="truncate text-xs text-slate-500">{{ current_user.email or current_user.login_id }}</p>
           <div class="mt-2 flex flex-wrap items-center gap-2">
             {% if current_user.is_intern %}
               {{ programme_badge(current_user.programme.code) }}

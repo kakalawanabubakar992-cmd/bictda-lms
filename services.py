@@ -9,6 +9,7 @@ are easy to test and to explain in the project report:
     3. mark_attendance()            - one record per intern per course per day
     4. post_assignment() / submit_assignment() / grade_submission()
     5. ID generators                - BICTDA-SIWES-001, BICTDA-NYSC-001, BICTDA-FAC-001
+    6. register_intern() / register_facilitator() - sign-up rules for both roles
 """
 import re
 from datetime import datetime, time, timedelta
@@ -21,6 +22,8 @@ from models import (
     ENROLL_ACTIVE,
     ENROLL_COMPLETED,
     PASS_MARK,
+    ROLE_FACILITATOR,
+    ROLE_INTERN,
     STATUS_ACTIVE,
     STATUS_FAILED,
     STATUS_LOCKED,
@@ -29,11 +32,15 @@ from models import (
     Attendance,
     Course,
     CourseProgress,
+    IssuedFacilitatorID,
     Notification,
+    Programme,
     Submission,
     User,
 )
-from utils import now_wat, today_wat
+from utils import normalize_phone, now_wat, today_wat
+
+MIN_PASSWORD_LENGTH = 8
 
 
 # ===========================================================================
@@ -450,3 +457,87 @@ def create_notification(user, message, link=None, icon="fa-solid fa-bell", commi
     if commit:
         db.session.commit()
     return notification
+
+
+# ===========================================================================
+# 6. SIGN-UP (passwords are always hashed by User.set_password)
+# ===========================================================================
+def _check_password(password, confirm):
+    if len(password or "") < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    if password != confirm:
+        raise ValueError("The two passwords do not match.")
+
+
+def set_facilitator_courses(facilitator, course_ids, commit=True):
+    """Save the courses a facilitator offers (at least one). Several facilitators may share a course."""
+    ids = {int(i) for i in course_ids or [] if str(i).isdigit()}
+    courses = Course.query.filter(Course.id.in_(ids)).order_by(Course.sequence_order).all() if ids else []
+    if not courses:
+        raise ValueError("Please choose at least one course you will facilitate.")
+    facilitator.taught_courses = courses
+    if commit:
+        db.session.commit()
+    return courses
+
+
+def register_intern(full_name, email, phone, programme_code, password, confirm, commit=True):
+    """
+    Intern sign-up: full name, email, phone, programme (SIWES/NYSC) and password.
+    Email and phone must be unique. The intern gets a BICTDA Intern ID and Course 1 starts today.
+    """
+    full_name = " ".join((full_name or "").split())
+    email = (email or "").strip().lower()
+    phone = normalize_phone(phone)
+    programme = Programme.query.filter_by(code=(programme_code or "").upper()).first()
+
+    if len(full_name) < 3:
+        raise ValueError("Please enter your full name.")
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        raise ValueError("Please enter a valid email address.")
+    if not phone:
+        raise ValueError("Please enter a valid Nigerian phone number, e.g. 0803 123 4567.")
+    if programme is None:
+        raise ValueError("Please choose your programme: SIWES or NYSC.")
+    _check_password(password, confirm)
+    if User.query.filter(func.lower(User.email) == email).first():
+        raise ValueError("This email is already registered. Please sign in.")
+    if User.query.filter_by(phone=phone).first():
+        raise ValueError("This phone number is already registered.")
+
+    intern = User(role=ROLE_INTERN, full_name=full_name, email=email, phone=phone, programme=programme,
+                  intern_id=generate_intern_id(programme.code), enrollment_date=today_wat())
+    intern.set_password(password)
+    db.session.add(intern)
+    db.session.flush()
+    enroll_intern(intern, commit=False)
+    create_notification(intern, f"Welcome to the BICTDA {programme.code} Internship Portal, "
+                                f"{full_name.split()[0]}! Your Intern ID is {intern.intern_id}.",
+                        icon="fa-solid fa-hand-sparkles", commit=False)
+    if commit:
+        db.session.commit()
+    return intern
+
+
+def register_facilitator(facilitator_id, password, confirm, course_ids, commit=True):
+    """
+    Facilitator sign-up: a BICTDA-issued Facilitator ID + password + the courses they offer.
+    The ID must be in issued_facilitator_ids and must not have an account yet.
+    """
+    facilitator_id = (facilitator_id or "").strip().upper()
+    issued = IssuedFacilitatorID.query.filter(
+        func.upper(IssuedFacilitatorID.facilitator_id) == facilitator_id).first()
+    if issued is None:
+        raise ValueError("This Facilitator ID was not issued by BICTDA. Please check it or contact the admin.")
+    if User.query.filter(func.upper(User.facilitator_id) == facilitator_id).first():
+        raise ValueError("An account already exists for this Facilitator ID. Please sign in.")
+    _check_password(password, confirm)
+
+    facilitator = User(role=ROLE_FACILITATOR, facilitator_id=issued.facilitator_id,
+                       full_name=issued.full_name or issued.facilitator_id)
+    facilitator.set_password(password)
+    set_facilitator_courses(facilitator, course_ids, commit=False)   # raises if no course chosen
+    db.session.add(facilitator)
+    if commit:
+        db.session.commit()
+    return facilitator

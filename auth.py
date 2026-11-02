@@ -2,9 +2,11 @@
 auth.py - Landing portal, Intern Sign In, Facilitator Sign In and Logout.
 
     /                   Landing portal (programmes, course tracks, sign-in cards)
-    /login/intern       Intern Sign In  (Email | Intern ID | Phone Number + Password)
-    /login/facilitator  Facilitator Sign In (Facilitator ID + Password)
-    /logout             Sign out (POST only, protected by CSRF)
+    /login/intern          Intern Sign In  (Email | Intern ID | Phone Number + Password)
+    /login/facilitator     Facilitator Sign In (Facilitator ID + Password)
+    /register/intern       Intern Sign Up (full name, email, phone, programme, password)
+    /register/facilitator  Facilitator Sign Up (BICTDA-issued ID, password, courses offered)
+    /logout                Sign out (POST only, protected by CSRF)
 """
 from urllib.parse import urlsplit
 
@@ -14,6 +16,7 @@ from sqlalchemy import func
 
 from decorators import home_url_for
 from models import ENROLL_SUSPENDED, ROLE_FACILITATOR, ROLE_INTERN, Course, Programme, User
+from services import register_facilitator, register_intern
 from utils import normalize_phone
 
 auth_bp = Blueprint("auth", __name__)
@@ -86,6 +89,24 @@ def demo_accounts():
     }
 
 
+def _portal_page(portal, mode="signin", method="email", identifier=""):
+    """Render login.html for one portal (intern/facilitator) in sign-in or sign-up mode."""
+    titles = {"signin": "Sign In", "signup": "Sign Up"}
+    return render_template(
+        "login.html",
+        title=f"{portal.title()} {titles[mode]}",
+        portal=portal,
+        mode=mode,
+        method=method,
+        methods=INTERN_METHODS,
+        identifier=identifier,
+        form=request.form,
+        programmes=Programme.query.order_by(Programme.id).all(),
+        courses=Course.query.order_by(Course.sequence_order).all(),
+        demo=demo_accounts(),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -93,12 +114,13 @@ def demo_accounts():
 def index():
     """Landing portal page."""
     programmes = Programme.query.order_by(Programme.id).all()
+    courses = Course.query.order_by(Course.sequence_order).all()
     stats = {
         "interns": User.query.filter_by(role=ROLE_INTERN).count(),
         "facilitators": User.query.filter_by(role=ROLE_FACILITATOR).count(),
         "courses": Course.query.count(),
     }
-    return render_template("index.html", programmes=programmes, stats=stats)
+    return render_template("index.html", programmes=programmes, courses=courses, stats=stats)
 
 
 @auth_bp.route("/login")
@@ -132,15 +154,7 @@ def login_intern():
             flash(f"Welcome back, {user.full_name.split()[0]}!", "success")
             return redirect(safe_next_url(request.args.get("next")) or url_for("intern.dashboard"))
 
-    return render_template(
-        "login.html",
-        title="Intern Sign In",
-        portal="intern",
-        method=method,
-        methods=INTERN_METHODS,
-        identifier=identifier,
-        demo=demo_accounts(),
-    )
+    return _portal_page("intern", method=method, identifier=identifier)
 
 
 @auth_bp.route("/login/facilitator", methods=["GET", "POST"])
@@ -163,15 +177,41 @@ def login_facilitator():
             flash(f"Welcome back, {user.full_name}!", "success")
             return redirect(safe_next_url(request.args.get("next")) or url_for("facilitator.dashboard"))
 
-    return render_template(
-        "login.html",
-        title="Facilitator Sign In",
-        portal="facilitator",
-        method=None,
-        methods=INTERN_METHODS,
-        identifier=identifier,
-        demo=demo_accounts(),
-    )
+    return _portal_page("facilitator", identifier=identifier)
+
+
+@auth_bp.route("/register/intern", methods=["GET", "POST"])
+def register_intern_page():
+    if current_user.is_authenticated:
+        return redirect(home_url_for(current_user))
+    if request.method == "POST":
+        form = request.form
+        try:
+            intern = register_intern(form.get("full_name"), form.get("email"), form.get("phone"),
+                                     form.get("programme"), form.get("password"), form.get("confirm_password"))
+            login_user(intern)
+            flash(f"Welcome, {intern.full_name.split()[0]}! Your BICTDA Intern ID is {intern.intern_id}.", "success")
+            return redirect(url_for("intern.dashboard"))
+        except ValueError as error:
+            flash(str(error), "error")
+    return _portal_page("intern", mode="signup")
+
+
+@auth_bp.route("/register/facilitator", methods=["GET", "POST"])
+def register_facilitator_page():
+    if current_user.is_authenticated:
+        return redirect(home_url_for(current_user))
+    if request.method == "POST":
+        form = request.form
+        try:
+            facilitator = register_facilitator(form.get("facilitator_id"), form.get("password"),
+                                               form.get("confirm_password"), form.getlist("courses"))
+            login_user(facilitator)
+            flash(f"Welcome, {facilitator.full_name}! Your facilitator account is ready.", "success")
+            return redirect(url_for("facilitator.dashboard"))
+        except ValueError as error:
+            flash(str(error), "error")
+    return _portal_page("facilitator", mode="signup")
 
 
 @auth_bp.route("/logout", methods=["POST"])
