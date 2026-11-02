@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import avatar, programme_badge, status_badge %}
+
+{% block content %}
+<div class="mx-auto max-w-6xl space-y-6">
+
+  <!-- ============ Choose course and date ============ -->
+  <form method="get" class="grid gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-[1fr_auto_auto] sm:items-end sm:p-6">
+    <div>
+      <label for="course" class="form-label">Course</label>
+      <select id="course" name="course" class="form-input">
+        {% for c in courses %}
+          <option value="{{ c.id }}" {{ "selected" if course and c.id == course.id }}>{{ c.order_label }}: {{ c.title }}{{ " (yours)" if c.facilitator_id == current_user.id }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="date" class="form-label">Date</label>
+      <input id="date" name="date" type="date" value="{{ on_date.isoformat() }}" max="{{ today.isoformat() }}" class="form-input">
+    </div>
+    <button type="submit" class="btn-primary"><i class="fa-solid fa-magnifying-glass"></i>Load</button>
+  </form>
+
+  {% if not rows %}
+    <section class="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
+      <i class="fa-solid fa-users-slash mb-2 block text-3xl text-slate-300"></i>No interns are currently taking this course.
+    </section>
+  {% else %}
+
+  <!-- ============ Mark each intern ============ -->
+  <form method="post" class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="course" value="{{ course.id }}">
+    <input type="hidden" name="date" value="{{ on_date.isoformat() }}">
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5 sm:p-6">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">{{ course.title }} &middot; {{ on_date|date("%A, %d %b %Y") }}</h3>
+        <p class="text-xs text-slate-500">{{ rows|length }} intern{{ "s" if rows|length != 1 }} &middot; Punctual = 100% &middot; Late = 50% &middot; Absent = 0%</p>
+      </div>
+      <button type="button" data-mark-all="PUNCTUAL" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
+        <i class="fa-solid fa-check-double mr-1.5"></i>Mark all Punctual
+      </button>
+    </div>
+
+    <ul class="divide-y divide-slate-100">
+      {% for p in rows %}
+        <li class="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:px-6">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            {{ avatar(p.intern, "h-10 w-10", "text-xs") }}
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold text-slate-800">{{ p.intern.full_name }}</p>
+              <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                {{ p.intern.intern_id }} {{ programme_badge(p.intern.programme.code) }}
+                {% if p.is_failed %}{{ status_badge(p) }}{% endif %}
+                <span>Attendance {{ p.live_attendance_rate }}%</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 sm:w-80" role="radiogroup" aria-label="Attendance for {{ p.intern.full_name }}">
+            {% for value, label, credit, colour in options %}
+              <label class="cursor-pointer">
+                <input type="radio" name="status_{{ p.intern_id }}" value="{{ value }}" class="peer sr-only" {{ "checked" if marked.get(p.intern_id) == value }}>
+                <span class="flex flex-col items-center rounded-xl border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-500 transition hover:border-{{ colour }}-300
+                             peer-checked:border-{{ colour }}-500 peer-checked:bg-{{ colour }}-500 peer-checked:text-white peer-focus-visible:ring-4 peer-focus-visible:ring-{{ colour }}-500/20">
+                  {{ label }}<span class="text-[10px] font-medium opacity-80">{{ credit }}%</span>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:px-6">
+      <p class="text-xs text-slate-500">Saving again for the same date updates the existing records.</p>
+      <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i>Save Attendance</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

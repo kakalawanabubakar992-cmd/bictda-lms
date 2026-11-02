@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/_macros.html" import badge, programme_badge, status_badge, metric_card, progress_bar, avatar %}
+{% from "partials/_macros.html" import badge, programme_badge, status_badge, submission_badge, metric_card, progress_bar, avatar %}
 
 {% block content %}
 <div class="mx-auto max-w-7xl space-y-6">
@@ -106,11 +106,7 @@
             <p class="truncate text-sm font-semibold text-slate-800">{{ assignment.title }}</p>
             <p class="text-xs text-slate-500">Due {{ assignment.due_date|datetime }} &middot; {{ assignment.max_score }} marks</p>
           </div>
-          {% if submission %}
-            {{ badge(submission.status_label, "emerald" if submission.is_graded else "royal", "fa-solid fa-check") }}
-          {% else %}
-            {{ badge("Not Submitted", "rose", "fa-solid fa-circle-exclamation") }}
-          {% endif %}
+          {{ submission_badge(submission) }}
         </li>
       {% else %}
         <li class="py-8 text-center text-sm text-slate-500"><i class="fa-regular fa-face-smile mb-2 block text-3xl text-slate-300"></i>No upcoming deadlines.</li>

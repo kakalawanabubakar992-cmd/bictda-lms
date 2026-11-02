@@ -1,6 +1,6 @@
 {# =====================================================================
    Reusable UI pieces. Import them in a template with:
-   {% from "partials/_macros.html" import logo, badge, programme_badge, status_badge, metric_card, progress_bar, avatar %}
+   {% from "partials/_macros.html" import logo, badge, programme_badge, status_badge, submission_badge, metric_card, progress_bar, avatar %}
    ===================================================================== #}
 
 {# ---------- BICTDA official logo (static/icons/bictda-logo.png) ---------- #}
@@ -50,6 +50,19 @@
 } %}
 {% set style = styles.get(progress.status, ("slate", None)) %}
 {{ badge(progress.status_label, style[0], style[1]) }}
+{%- endmacro %}
+
+{# ---------- Assignment submission status badge (Not Submitted / Submitted / Late / Graded) ---------- #}
+{% macro submission_badge(submission) -%}
+{% if submission is none %}
+  {{ badge("Not Submitted", "rose", "fa-solid fa-circle-exclamation") }}
+{% elif submission.is_graded %}
+  {{ badge("Graded", "emerald", "fa-solid fa-circle-check") }}
+{% elif submission.is_late %}
+  {{ badge("Late", "amber", "fa-solid fa-clock") }}
+{% else %}
+  {{ badge("Submitted", "royal", "fa-solid fa-paper-plane") }}
+{% endif %}
 {%- endmacro %}
 
 {# ---------- Dashboard metric card ---------- #}

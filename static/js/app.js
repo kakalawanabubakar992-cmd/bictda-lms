@@ -220,6 +220,28 @@
       });
     }
 
+    if (canvas.getAttribute("data-chart") === "stacked") {   /* stacked bars: data-series='[{label, values}]' */
+      var series = JSON.parse(canvas.getAttribute("data-series") || "[]");
+      var colours = ["#10b981", "#3b63f3", "#cbd5e1"];
+      return new Chart(canvas, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: series.map(function (s, i) {
+            return { label: s.label, data: s.values, backgroundColor: colours[i % colours.length], borderRadius: 6, maxBarThickness: 48 };
+          })
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom", labels: { usePointStyle: true, padding: 16, font: font } } },
+          scales: {
+            x: { stacked: true, ticks: { font: font }, grid: { display: false } },
+            y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: font }, grid: { color: "#eef2f7" } }
+          }
+        }
+      });
+    }
+
     return new Chart(canvas, {   /* doughnut */
       type: "doughnut",
       data: {
@@ -237,4 +259,12 @@
   if (window.Chart) {
     document.querySelectorAll("canvas[data-chart]").forEach(drawChart);
   }
+
+  /* ---------- "Mark all" buttons: <button data-mark-all="PUNCTUAL"> ticks that radio for every row in its form ---------- */
+  document.querySelectorAll("[data-mark-all]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var value = btn.getAttribute("data-mark-all");
+      btn.form.querySelectorAll('input[type="radio"][value="' + value + '"]').forEach(function (radio) { radio.checked = true; });
+    });
+  });
 })();

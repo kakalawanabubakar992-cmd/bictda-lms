@@ -1,23 +1,23 @@
 """
 intern.py - Intern portal pages.
 
-PHASE 3: Dashboard, Profile and Attendance are built.
-Courses shows the sequential 6-month track. Assignments is still a placeholder (Phase 4).
+Dashboard, Profile, Attendance, Courses (sequential 6-month track) and Assignments.
 """
-from flask import Blueprint, render_template, request
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from decorators import intern_required
-from models import COURSE_DURATION_WEEKS, Attendance
-from services import attendance_label, attendance_summary, attendance_trend
+from extensions import db
+from models import COURSE_DURATION_WEEKS, Assignment, Attendance
+from services import attendance_label, attendance_summary, attendance_trend, submit_assignment
 from utils import now_wat
 
 intern_bp = Blueprint("intern", __name__)
 
 
-def _placeholder(title, phase, icon, description):
-    return render_template("placeholder.html", title=title, phase=phase,
-                           icon=icon, description=description)
+def _with_submissions(course, user):
+    """[(assignment, this intern's submission or None), ...] for one course."""
+    return [(a, a.submission_for(user)) for a in course.assignments]
 
 
 def _attendance_data(progress):
@@ -117,5 +117,34 @@ def courses():
 @intern_bp.route("/assignments")
 @intern_required
 def assignments():
-    return _placeholder("Assignments", 4, "fa-solid fa-file-pen",
-                        "View, submit and track your graded assignments.")
+    user = current_user
+    current = user.current_progress
+    items = _with_submissions(current.course, user) if current else []
+    history = [(p.course, _with_submissions(p.course, user)) for p in user.ordered_progress if p.is_passed]
+
+    graded = [s.percent for _, s in items if s and s.is_graded]
+    stats = {
+        "total": len(items),
+        "submitted": sum(1 for _, s in items if s),
+        "graded": len(graded),
+        "average": round(sum(graded) / len(graded), 1) if graded else None,
+    }
+    return render_template("intern/assignments.html", title="Assignments", current=current,
+                           items=items, history=history, stats=stats)
+
+
+@intern_bp.route("/assignments/<int:assignment_id>/submit", methods=["POST"])
+@intern_required
+def submit(assignment_id):
+    """Create or update a submission. All rules live in services.submit_assignment."""
+    assignment = db.session.get(Assignment, assignment_id) or abort(404)
+    try:
+        submission = submit_assignment(current_user, assignment,
+                                       request.form.get("response_text"), request.form.get("link_url"))
+        if submission.is_late:
+            flash("Submission saved, but it was after the due date (marked Late).", "warning")
+        else:
+            flash("Assignment submitted successfully.", "success")
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("intern.assignments", _anchor=f"assignment-{assignment_id}"))

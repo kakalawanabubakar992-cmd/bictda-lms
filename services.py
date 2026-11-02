@@ -7,7 +7,7 @@ are easy to test and to explain in the project report:
     1. calculate_attendance_rate()  - punctuality-weighted attendance %
     2. record_final_result()        - the "score of PASS_MARK or more unlocks the next course" rule
     3. mark_attendance()            - one record per intern per course per day
-    4. submit_assignment() / grade_submission()
+    4. post_assignment() / submit_assignment() / grade_submission()
     5. ID generators                - BICTDA-SIWES-001, BICTDA-NYSC-001, BICTDA-FAC-001
 """
 import re
@@ -25,6 +25,7 @@ from models import (
     STATUS_FAILED,
     STATUS_LOCKED,
     STATUS_PASSED,
+    Assignment,
     Attendance,
     Course,
     CourseProgress,
@@ -179,6 +180,16 @@ def enroll_intern(intern, start_date=None, commit=True):
     return intern.ordered_progress
 
 
+def current_progress_for(course):
+    """Progress rows of interns whose CURRENT course is this one (active or retaking), by Intern ID."""
+    return (CourseProgress.query
+            .filter(CourseProgress.course_id == course.id,
+                    CourseProgress.status.in_([STATUS_ACTIVE, STATUS_FAILED]))
+            .join(User, CourseProgress.intern_id == User.id)
+            .order_by(User.intern_id)
+            .all())
+
+
 def get_next_progress(progress):
     """The intern's CourseProgress row for the next course in sequence (or None)."""
     next_order = progress.course.sequence_order + 1
@@ -300,6 +311,44 @@ def record_final_result(progress, score, graded_by=None, effective_date=None, co
 # ===========================================================================
 # 3. ASSIGNMENTS
 # ===========================================================================
+def post_assignment(course, title, instructions, due_date, max_score, created_by=None, commit=True):
+    """
+    Facilitator posts a new assignment.
+      - Title, instructions, a future due date and a max score (1-1000) are required.
+      - Every intern currently in the course gets a notification.
+    due_date may be a datetime or the "YYYY-MM-DDTHH:MM" text sent by a date-time input.
+    """
+    title = (title or "").strip()
+    instructions = (instructions or "").strip()
+    if course is None:
+        raise ValueError("Please choose a course.")
+    if not title or not instructions:
+        raise ValueError("Title and instructions are required.")
+    if isinstance(due_date, str):
+        try:
+            due_date = datetime.strptime(due_date[:16], "%Y-%m-%dT%H:%M")
+        except ValueError:
+            raise ValueError("Please choose a valid due date and time.")
+    if due_date <= now_wat():
+        raise ValueError("The due date must be in the future.")
+    try:
+        max_score = int(max_score)
+    except (TypeError, ValueError):
+        raise ValueError("Max score must be a whole number.")
+    if not 1 <= max_score <= 1000:
+        raise ValueError("Max score must be between 1 and 1000.")
+
+    assignment = Assignment(course=course, title=title[:200], instructions=instructions,
+                            due_date=due_date, max_score=max_score, created_by=created_by)
+    db.session.add(assignment)
+    for progress in current_progress_for(course):
+        create_notification(progress.intern, f'New assignment in {course.title}: "{title[:120]}"',
+                            link="/assignments", icon="fa-solid fa-file-circle-plus", commit=False)
+    if commit:
+        db.session.commit()
+    return assignment
+
+
 def submit_assignment(intern, assignment, response_text=None, link_url=None, commit=True):
     """
     Create or update an intern's submission.

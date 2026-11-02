@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import badge, metric_card, avatar, submission_badge %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6">
+
+  <!-- ============ Welcome banner ============ -->
+  <section class="bictda-hero-bg rounded-3xl p-6 text-white shadow-xl sm:p-8">
+    <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
+      {{ avatar(current_user, "h-16 w-16", "text-xl") }}
+      <div class="min-w-0 flex-1">
+        <p class="text-sm text-white/70">Welcome back,</p>
+        <h2 class="truncate text-2xl font-extrabold sm:text-3xl">{{ current_user.full_name }}</h2>
+        <p class="mt-1 text-sm text-white/70">{{ current_user.facilitator_id }} &middot; {{ current_user.specialization or "Facilitator" }}</p>
+      </div>
+    </div>
+    {% if current_user.taught_courses %}
+      <div class="mt-5 flex flex-wrap gap-2">
+        {% for course in current_user.taught_courses|sort(attribute="sequence_order") %}
+          <span class="glass rounded-full px-3 py-1 text-xs font-semibold"><i class="{{ course.icon }} mr-1.5 text-emerald-300"></i>{{ course.title }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- ============ Metric cards ============ -->
+  <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {{ metric_card("fa-solid fa-users", "Total Interns", total_interns, "SIWES and NYSC", "royal") }}
+    {{ metric_card("fa-solid fa-user-graduate", "Active Interns", course_counts|sum(attribute=1), "Currently taking a course", "sky") }}
+    {{ metric_card("fa-solid fa-calendar-check", "Today's Attendance",
+                   (today_rate ~ "%") if today_rate is not none else "Not marked",
+                   today_count ~ " record" ~ ("s" if today_count != 1 else "") ~ " today", "emerald") }}
+    {{ metric_card("fa-solid fa-clipboard-list", "Pending Grading", pending|length, "Submissions to grade", "amber") }}
+  </section>
+
+  <!-- ============ Chart + interns per course ============ -->
+  <section class="grid gap-6 lg:grid-cols-3">
+    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:col-span-2">
+      <h3 class="text-base font-bold text-slate-900">Course Progress</h3>
+      <p class="text-xs text-slate-500">Interns per course by status</p>
+      <div class="mt-4 h-72">
+        <canvas data-chart="stacked" data-labels='{{ chart.labels|tojson }}' data-series='{{ chart.series|tojson }}' aria-label="Course progress chart"></canvas>
+      </div>
+    </div>
+
+    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <h3 class="text-base font-bold text-slate-900">Interns per Course</h3>
+      <ul class="mt-4 space-y-3">
+        {% for course, count in course_counts %}
+          <li class="flex items-center gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-royal-50 text-royal-600"><i class="{{ course.icon }}"></i></span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-semibold text-slate-800">{{ course.title }}</p>
+              <p class="text-xs text-slate-500">{{ course.order_label }} &middot; {{ course.length_label }}{% if course.facilitator_id == current_user.id %} &middot; <span class="font-semibold text-emerald-600">Yours</span>{% endif %}</p>
+            </div>
+            <a href="{{ url_for('facilitator.attendance', course=course.id) }}" class="text-right" title="Mark attendance">
+              <span class="block text-lg font-extrabold text-slate-900">{{ count }}</span>
+              <span class="block text-[11px] text-royal-600">Mark <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ Quick actions ============ -->
+  <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% for endpoint, icon, label, text, colour in [
+      ("facilitator.attendance",  "fa-solid fa-user-check",      "Mark Attendance",   "Punctual, Late or Absent",            "emerald"),
+      ("facilitator.assignments", "fa-solid fa-file-circle-plus", "Post Assignment",  "Title, instructions and due date",    "royal"),
+      ("facilitator.grading",     "fa-solid fa-clipboard-check", "Grade Submissions", "Scores and feedback",                 "amber"),
+      ("facilitator.interns",     "fa-solid fa-award",           "Final Results",     pass_mark ~ "% or more unlocks the next course", "violet"),
+    ] %}
+      <a href="{{ url_for(endpoint) }}" class="group flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-{{ colour }}-100 text-{{ colour }}-600"><i class="{{ icon }} text-lg"></i></span>
+        <span class="min-w-0">
+          <span class="block text-sm font-bold text-slate-900">{{ label }}</span>
+          <span class="block truncate text-xs text-slate-500">{{ text }}</span>
+        </span>
+      </a>
+    {% endfor %}
+  </section>
+
+  <!-- ============ Oldest submissions waiting for a grade ============ -->
+  <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h3 class="text-base font-bold text-slate-900">Waiting for a Grade</h3>
+      <a href="{{ url_for('facilitator.grading') }}" class="text-xs font-semibold text-royal-600 hover:text-royal-700">Grade all <i class="fa-solid fa-arrow-right ml-1"></i></a>
+    </div>
+    <ul class="mt-4 divide-y divide-slate-100">
+      {% for submission in pending[:5] %}
+        <li class="flex flex-wrap items-center gap-3 py-3">
+          {{ avatar(submission.intern, "h-10 w-10", "text-xs") }}
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-semibold text-slate-800">{{ submission.intern.full_name }} &middot; {{ submission.assignment.title }}</p>
+            <p class="text-xs text-slate-500">{{ submission.assignment.course.title }} &middot; submitted {{ submission.submitted_at|timeago }}</p>
+          </div>
+          {{ submission_badge(submission) }}
+        </li>
+      {% else %}
+        <li class="py-8 text-center text-sm text-slate-500"><i class="fa-regular fa-circle-check mb-2 block text-3xl text-slate-300"></i>Everything is graded.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}
