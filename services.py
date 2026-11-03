@@ -369,6 +369,8 @@ def submit_assignment(intern, assignment, response_text=None, link_url=None, com
         raise ValueError("Please write a response or paste a link.")
     if link_url and not re.match(r"^https?://", link_url, re.IGNORECASE):
         raise ValueError("Links must start with http:// or https://")
+    if len(link_url) > 500:
+        raise ValueError("The link is too long (500 characters at most).")
 
     current = intern.current_progress
     if current is None or current.course_id != assignment.course_id:
@@ -491,9 +493,9 @@ def register_intern(full_name, email, phone, programme_code, password, confirm, 
     phone = normalize_phone(phone)
     programme = Programme.query.filter_by(code=(programme_code or "").upper()).first()
 
-    if len(full_name) < 3:
-        raise ValueError("Please enter your full name.")
-    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+    if not 3 <= len(full_name) <= 120:
+        raise ValueError("Please enter your full name (up to 120 characters).")
+    if len(email) > 120 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         raise ValueError("Please enter a valid email address.")
     if not phone:
         raise ValueError("Please enter a valid Nigerian phone number, e.g. 0803 123 4567.")

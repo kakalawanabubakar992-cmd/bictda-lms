@@ -238,8 +238,24 @@ def _at(day, hour=10, minute=0):
 # ---------------------------------------------------------------------------
 # Main seeder
 # ---------------------------------------------------------------------------
+def seed_reference_data():
+    """
+    Programmes, the course track and the issued Facilitator IDs. The LMS needs these even
+    without demo data (e.g. sign-up must list SIWES/NYSC and the courses). Safe to run on every start.
+    """
+    if Programme.query.first() is None:
+        for p in PROGRAMMES:
+            db.session.add(Programme(code=p["code"], name=p["name"],
+                                     description=p["description"], badge_color=p["badge_color"]))
+    if Course.query.first() is None:
+        seed_courses()
+    db.session.commit()
+    seed_issued_ids()
+
+
 def seed_database(verbose=True):
-    """Seed demo data ONLY if the database has no users. Returns True if it seeded."""
+    """Seed demo users ONLY if the database has no users. Returns True if it seeded."""
+    seed_reference_data()
     if User.query.first() is not None:
         if verbose:
             print("[seed] Database already has data - seeding skipped.")
@@ -247,18 +263,11 @@ def seed_database(verbose=True):
 
     today = today_wat()
 
-    # 1. Programmes and the shared course track
-    programmes = {}
-    for p in PROGRAMMES:
-        programme = Programme(code=p["code"], name=p["name"],
-                              description=p["description"], badge_color=p["badge_color"])
-        db.session.add(programme)
-        programmes[p["code"]] = programme
-
-    courses = seed_courses()
+    # 1. Programmes and the shared course track (created by seed_reference_data)
+    programmes = {p.code: p for p in Programme.query.all()}
+    courses = {c.sequence_order: c for c in Course.query.all()}
 
     # 2. Facilitators - signed up through the same function as the Sign Up page
-    seed_issued_ids()
     for f in FACILITATORS:
         facilitator = register_facilitator(f["facilitator_id"], FACILITATOR_PASSWORD, FACILITATOR_PASSWORD,
                                            [courses[order].id for order in f["teaches"]], commit=False)

@@ -70,14 +70,18 @@ def create_app(config_class=Config):
     # ----- Database tables + demo data
     with app.app_context():
         db.create_all()
-        from seed import seed_database, seed_issued_ids
+        from seed import seed_database, seed_reference_data
         try:
+            seed_reference_data()      # programmes, courses + any Facilitator IDs added to seed.py
             if app.config["AUTO_SEED"]:
-                seed_database(verbose=True)
-            seed_issued_ids()          # Facilitator IDs the admin added to seed.py since the last start
+                seed_database(verbose=True)    # demo interns and facilitators (only into an empty database)
         except IntegrityError:
             # Another server process seeded at the same moment - safe to ignore
             db.session.rollback()
+        # Gunicorn starts the app once, then copies it into each worker:
+        # close start-up connections so every worker opens its own.
+        db.session.remove()
+        db.engine.dispose()
 
     # ----- Template helpers
     @app.context_processor

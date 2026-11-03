@@ -1,0 +1,27 @@
+# Render Blueprint for BICTDA LMS
+# Render reads this file from the root of the GitHub repo and creates the web service.
+# Every `git push` to the main branch rebuilds and redeploys the live site automatically.
+services:
+  - type: web
+    name: bictda-lms
+    runtime: python
+    plan: free
+    region: frankfurt            # closest Render region to Nigeria (pick Frankfurt on Neon too)
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 2 --timeout 120
+    healthCheckPath: /healthz    # Render checks this page to know the app and database are working
+    autoDeployTrigger: commit    # deploy on every push to main
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"         # same Python as on your laptop
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true      # Render creates a long random secret for you
+      - key: DATABASE_URL
+        sync: false              # you paste the Neon connection string when you create the Blueprint
+      - key: AUTO_SEED
+        value: "true"            # demo accounts for your defence; set to "false" for real use
+      - key: SHOW_DEMO_LOGINS
+        value: "true"            # demo accounts box on the sign-in page; "false" for real use

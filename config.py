@@ -55,6 +55,9 @@ class Config:
         "pool_pre_ping": True,   # test connections first (Neon suspends idle databases)
         "pool_recycle": 280,     # refresh connections every ~5 minutes
     }
+    if SQLALCHEMY_DATABASE_URI.startswith("postgresql"):
+        # Neon's pooled connection (PgBouncer) - turn off psycopg's automatic prepared statements
+        SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = {"prepare_threshold": None}
 
     # Seed demo data automatically when the database is empty
     AUTO_SEED = os.environ.get("AUTO_SEED", "true").lower() == "true"
