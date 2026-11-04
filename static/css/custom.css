@@ -203,3 +203,13 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* Result slip: when printing (or "Save as PDF") show only the slip, on one A4 page */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body { background: #fff !important; }
+  body *:not(.print-area):not(.print-area *):not(:has(.print-area)) { display: none !important; }
+  body *:has(.print-area) { background: none !important; margin: 0 !important; padding: 0 !important; }
+  .print-area { position: absolute; inset: 0 0 auto 0; box-shadow: none !important; }
+  .print-area, .print-area * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

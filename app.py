@@ -13,10 +13,11 @@ What happens here:
 """
 import json
 import os
-from flask import Flask, Response, abort, flash, redirect, render_template, request, url_for
+from io import BytesIO
+from flask import Flask, Response, abort, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 from flask_wtf.csrf import CSRFError
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -49,7 +50,8 @@ def create_app(config_class=Config):
     login_manager.session_protection = "basic"
 
     import models  # noqa: F401  (registers the tables and the user loader)
-    from models import Notification
+    from models import Notification, Submission
+    from services import can_download_submission
 
     @login_manager.unauthorized_handler
     def unauthorized():
@@ -70,6 +72,14 @@ def create_app(config_class=Config):
     # ----- Database tables + demo data
     with app.app_context():
         db.create_all()
+        # Databases made before file uploads existed: add the new columns and keep all existing data
+        columns = {c["name"] for c in inspect(db.engine).get_columns("submissions")}
+        blob = "BYTEA" if db.engine.dialect.name == "postgresql" else "BLOB"
+        upload_columns = {"file_name": "VARCHAR(255)", "file_type": "VARCHAR(100)", "file_size": "INTEGER", "file_data": blob}
+        with db.engine.begin() as connection:
+            for name, sql_type in upload_columns.items():
+                if name not in columns:
+                    connection.execute(text(f"ALTER TABLE submissions ADD COLUMN {name} {sql_type}"))
         from seed import seed_database, seed_reference_data
         try:
             seed_reference_data()      # programmes, courses + any Facilitator IDs added to seed.py
@@ -177,7 +187,24 @@ def create_app(config_class=Config):
         flash("All notifications marked as read.", "success")
         return redirect(request.referrer or home_url_for(current_user))
 
+    # ----- Assignment file download (the intern who submitted + facilitators of that course)
+    @app.route("/submissions/<int:submission_id>/file")
+    @login_required
+    def download_submission(submission_id):
+        submission = db.session.get(Submission, submission_id)
+        if submission is None or not submission.has_file or not can_download_submission(current_user, submission):
+            abort(404)
+        # Always a download (never opened in the browser), so an uploaded .html file cannot run on our site
+        return send_file(BytesIO(submission.file_data), mimetype=submission.file_type,
+                         as_attachment=True, download_name=submission.download_name)
+
     # ----- Error pages
+    @app.errorhandler(413)
+    def file_too_large(error):
+        flash(f"File too large. The limit is {app.config['MAX_UPLOAD_MB']} MB.", "error")
+        referrer = request.referrer or ""
+        return redirect(referrer if referrer.startswith(request.host_url) else home_url_for(current_user))
+
     @app.errorhandler(404)
     def not_found(error):
         return render_template("errors/404.html", title="Page Not Found"), 404

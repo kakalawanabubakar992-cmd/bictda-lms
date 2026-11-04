@@ -13,7 +13,11 @@ NYSC corps members.
 - SIWES and NYSC programmes with auto-generated IDs (`BICTDA-SIWES-001`, `BICTDA-NYSC-001`)
 - One 6-month track of 4 courses for SIWES and NYSC, taken in order. The next course unlocks only when the final score is **50% or more**
 - Attendance with punctuality credit: Punctual 100%, Late 50%, Absent 0%
-- Assignments: facilitators post and grade them, interns submit them
+- Assignments: facilitators post and grade them, interns submit them (text, link and/or a file:
+  PDF, DOC, DOCX, TXT, HTML, CSS, JS, PY, IPYNB, max 5 MB). Files are stored in the database so they survive
+  Render redeploys; only the intern and the facilitators of that course can download them
+- My Results: interns see their final course results and print / save a result slip (BICTDA logo,
+  full name, course, duration, score, signed by the Executive Secretary) for every course they pass
 - Chart.js dashboards, works on phones and can be installed as an app (PWA)
 
 ## Course track (same for every SIWES and NYSC intern, 6 months)

@@ -1,7 +1,7 @@
 """
 intern.py - Intern portal pages.
 
-Dashboard, Profile, Attendance, Courses (sequential 6-month track) and Assignments.
+Dashboard, Profile, Attendance, Courses (sequential 6-month track), Assignments and My Results.
 """
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -114,6 +114,19 @@ def courses():
     return render_template("intern/courses.html", title="My Courses", track=track, total_months=total_months)
 
 
+@intern_bp.route("/results")
+@intern_bp.route("/results/<int:progress_id>")
+@intern_required
+def results(progress_id=None):
+    """My Results: graded courses only. With progress_id: the printable result slip of a PASSED course."""
+    graded = [p for p in current_user.ordered_progress if p.is_completed]
+    if progress_id is None:
+        return render_template("intern/results.html", title="My Results", graded=graded, slip=None)
+    # Only this intern's own passed courses - anything else is "not found"
+    slip = next((p for p in graded if p.id == progress_id and p.is_passed), None) or abort(404)
+    return render_template("intern/results.html", title=f"Result Slip - {slip.course.title}", graded=graded, slip=slip)
+
+
 @intern_bp.route("/assignments")
 @intern_required
 def assignments():
@@ -139,8 +152,8 @@ def submit(assignment_id):
     """Create or update a submission. All rules live in services.submit_assignment."""
     assignment = db.session.get(Assignment, assignment_id) or abort(404)
     try:
-        submission = submit_assignment(current_user, assignment,
-                                       request.form.get("response_text"), request.form.get("link_url"))
+        submission = submit_assignment(current_user, assignment, request.form.get("response_text"),
+                                       request.form.get("link_url"), request.files.get("file"))
         if submission.is_late:
             flash("Submission saved, but it was after the due date (marked Late).", "warning")
         else:

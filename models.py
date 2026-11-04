@@ -497,6 +497,11 @@ class Submission(db.Model):
     intern_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     response_text = db.Column(db.Text)
     link_url = db.Column(db.String(500))
+    # Uploaded file (kept in the database so it survives Render redeploys)
+    file_name = db.Column(db.String(255))
+    file_type = db.Column(db.String(100))
+    file_size = db.Column(db.Integer)
+    file_data = db.deferred(db.Column(db.LargeBinary))   # only loaded when downloaded
     submitted_at = db.Column(db.DateTime, default=now_wat)
     updated_at = db.Column(db.DateTime, default=now_wat, onupdate=now_wat)
     is_late = db.Column(db.Boolean, default=False)
@@ -519,6 +524,20 @@ class Submission(db.Model):
         if self.is_graded:
             return "Graded"
         return "Late" if self.is_late else "Submitted"
+
+    @property
+    def has_file(self):
+        return bool(self.file_name)
+
+    @property
+    def download_name(self):
+        """Unique, safe name for downloads, e.g. BICTDA-SIWES-001-A3-index.html"""
+        return f"{self.intern.intern_id}-A{self.assignment_id}-{self.file_name}"
+
+    @property
+    def file_size_label(self):
+        size = self.file_size or 0
+        return f"{size / 1024 / 1024:.1f} MB" if size >= 1024 * 1024 else f"{max(1, round(size / 1024))} KB"
 
     @property
     def percent(self):

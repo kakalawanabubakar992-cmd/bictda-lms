@@ -11,10 +11,13 @@ are easy to test and to explain in the project report:
     5. ID generators                - BICTDA-SIWES-001, BICTDA-NYSC-001, BICTDA-FAC-001
     6. register_intern() / register_facilitator() - sign-up rules for both roles
 """
+import mimetypes
 import re
 from datetime import datetime, time, timedelta
 
+from flask import current_app
 from sqlalchemy import func
+from werkzeug.utils import secure_filename
 
 from extensions import db
 from models import (
@@ -356,17 +359,43 @@ def post_assignment(course, title, instructions, due_date, max_score, created_by
     return assignment
 
 
-def submit_assignment(intern, assignment, response_text=None, link_url=None, commit=True):
+def read_upload(upload):
     """
-    Create or update an intern's submission.
+    Check an uploaded assignment file and return (safe_name, mime_type, data),
+    or None when no file was chosen. Raises ValueError for a wrong type or a file that is too big.
+    """
+    if upload is None or not upload.filename:
+        return None
+    allowed = current_app.config["ALLOWED_UPLOAD_EXTENSIONS"]
+    extension = upload.filename.rsplit(".", 1)[-1].lower() if "." in upload.filename else ""
+    if extension not in allowed:
+        raise ValueError("File type not allowed. Use: " + ", ".join(sorted(allowed)).upper() + ".")
+
+    data = upload.read()
+    limit_mb = current_app.config["MAX_UPLOAD_MB"]
+    if not data:
+        raise ValueError("The file you chose is empty.")
+    if len(data) > limit_mb * 1024 * 1024:
+        raise ValueError(f"The file is too large ({limit_mb} MB at most).")
+
+    # secure_filename removes folders and odd characters ("../../x" -> "x"); keep the extension
+    name = secure_filename(upload.filename)
+    if not name.lower().endswith("." + extension):
+        name = f"assignment.{extension}"
+    mime_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    return name[-255:], mime_type, data
+
+
+def submit_assignment(intern, assignment, response_text=None, link_url=None, upload=None, commit=True):
+    """
+    Create or update an intern's submission (one per assignment).
       - Only allowed for the intern's CURRENT course (active or retake).
       - Cannot be edited after it has been graded.
       - Submissions after the due date are accepted but flagged as Late.
+      - A new file replaces the old one; leaving the file empty keeps the old one.
     """
     response_text = (response_text or "").strip()
     link_url = (link_url or "").strip()
-    if not response_text and not link_url:
-        raise ValueError("Please write a response or paste a link.")
     if link_url and not re.match(r"^https?://", link_url, re.IGNORECASE):
         raise ValueError("Links must start with http:// or https://")
     if len(link_url) > 500:
@@ -382,6 +411,11 @@ def submit_assignment(intern, assignment, response_text=None, link_url=None, com
     if submission and submission.is_graded:
         raise ValueError("This assignment has already been graded and can no longer be edited.")
 
+    file = read_upload(upload)
+    has_old_file = submission is not None and submission.has_file
+    if not response_text and not link_url and not file and not has_old_file:
+        raise ValueError("Please write a response, paste a link or upload a file.")
+
     now = now_wat()
     if submission is None:
         submission = Submission(assignment_id=assignment.id, intern_id=intern.id, submitted_at=now)
@@ -389,12 +423,22 @@ def submit_assignment(intern, assignment, response_text=None, link_url=None, com
 
     submission.response_text = response_text or None
     submission.link_url = link_url or None
+    if file:
+        submission.file_name, submission.file_type, submission.file_data = file
+        submission.file_size = len(submission.file_data)
     submission.updated_at = now
     submission.is_late = now > assignment.due_date
 
     if commit:
         db.session.commit()
     return submission
+
+
+def can_download_submission(user, submission):
+    """Only the intern who submitted and the facilitators of that course may download the file."""
+    if user.is_intern:
+        return submission.intern_id == user.id
+    return user.is_facilitator and submission.assignment.course in user.taught_courses
 
 
 def grade_submission(submission, score, feedback=None, graded_by=None, commit=True):

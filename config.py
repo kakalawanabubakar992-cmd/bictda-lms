@@ -75,6 +75,19 @@ class Config:
     # Render sets RENDER_GIT_COMMIT; on your laptop the start-up time is used instead.
     APP_VERSION = os.environ.get("RENDER_GIT_COMMIT", "")[:12] or datetime.now().strftime("%Y%m%d%H%M%S")
 
+    # Assignment uploads - files are saved in the database (Render's free disk is wiped on every deploy)
+    MAX_UPLOAD_MB = 5
+    MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024   # Flask rejects bigger requests (error 413)
+    ALLOWED_UPLOAD_EXTENSIONS = {
+        "pdf", "doc", "docx", "txt",             # documents (every course)
+        "html", "htm", "css", "js",              # Web Development
+        "py", "ipynb",                           # Data Science & Python / Machine Learning
+    }
+
+    # Result slip signatory
+    RESULT_SIGNATORY_NAME = "Engr. Mohammed Kabir Wanori FNSE FNIEEE"
+    RESULT_SIGNATORY_TITLE = "Executive Secretary, BICTDA"
+
     # Branding
     APP_NAME = "BICTDA LMS"
     APP_FULL_NAME = "BICTDA Internship & Digital Skills Portal"

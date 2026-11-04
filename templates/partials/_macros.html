@@ -52,6 +52,15 @@
 {{ badge(progress.status_label, style[0], style[1]) }}
 {%- endmacro %}
 
+{# ---------- Uploaded assignment file (download link; shared by intern + facilitator pages) ---------- #}
+{% macro file_link(submission) -%}
+{% if submission.has_file %}
+  <a href="{{ url_for('download_submission', submission_id=submission.id) }}" class="mt-2 inline-flex items-center gap-2 break-all font-semibold text-royal-600 hover:text-royal-700">
+    <i class="fa-solid fa-file-arrow-down"></i>{{ submission.file_name }} <span class="font-normal text-slate-400">({{ submission.file_size_label }})</span>
+  </a>
+{% endif %}
+{%- endmacro %}
+
 {# ---------- Assignment submission status badge (Not Submitted / Submitted / Late / Graded) ---------- #}
 {% macro submission_badge(submission) -%}
 {% if submission is none %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/_macros.html" import avatar, programme_badge, submission_badge %}
+{% from "partials/_macros.html" import avatar, programme_badge, submission_badge, file_link %}
 
 {% block content %}
 <div class="mx-auto max-w-5xl space-y-6">
@@ -50,6 +50,7 @@
         {% if s.link_url %}
           <a href="{{ s.link_url }}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex items-center gap-2 break-all font-semibold text-royal-600 hover:text-royal-700"><i class="fa-solid fa-link"></i>{{ s.link_url }}</a>
         {% endif %}
+        {{ file_link(s) }}
       </div>
 
       <form method="post" action="{{ url_for('facilitator.grade', submission_id=s.id) }}" class="mt-4 grid gap-3 sm:grid-cols-[9rem_1fr_auto] sm:items-end">

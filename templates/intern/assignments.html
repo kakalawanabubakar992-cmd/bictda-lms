@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/_macros.html" import submission_badge, metric_card %}
+{% from "partials/_macros.html" import submission_badge, metric_card, file_link %}
 
 {# One assignment card. editable=True shows the submit / edit form (current course only). #}
 {% macro assignment_card(assignment, submission, editable) -%}
@@ -30,6 +30,7 @@
           <i class="fa-solid fa-link"></i>{{ submission.link_url }}
         </a>
       {% endif %}
+      {{ file_link(submission) }}
     </div>
   {% endif %}
 
@@ -55,7 +56,7 @@
         <i class="fa-solid {{ 'fa-pen' if submission else 'fa-paper-plane' }}"></i>{{ "Edit submission" if submission else "Submit assignment" }}
         <i class="fa-solid fa-chevron-down text-xs transition group-open:rotate-180"></i>
       </summary>
-      <form method="post" action="{{ url_for('intern.submit', assignment_id=assignment.id) }}" class="mt-4 space-y-4">
+      <form method="post" action="{{ url_for('intern.submit', assignment_id=assignment.id) }}" enctype="multipart/form-data" class="mt-4 space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label for="response-{{ assignment.id }}" class="mb-1.5 block text-sm font-semibold text-slate-700">Your answer</label>
@@ -68,6 +69,15 @@
           <input id="link-{{ assignment.id }}" name="link_url" type="url" maxlength="500" placeholder="https://"
                  value="{{ submission.link_url if submission and submission.link_url }}"
                  class="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none transition focus:border-royal-500 focus:ring-4 focus:ring-royal-500/15">
+        </div>
+        <div>
+          <label for="file-{{ assignment.id }}" class="mb-1.5 block text-sm font-semibold text-slate-700">
+            Upload file <span class="font-normal text-slate-400">(PDF, DOC, DOCX, TXT, HTML, CSS, JS, PY, IPYNB &middot; max {{ config.MAX_UPLOAD_MB }} MB)</span>
+          </label>
+          <input id="file-{{ assignment.id }}" name="file" type="file" accept=".{{ config.ALLOWED_UPLOAD_EXTENSIONS|sort|join(',.') }}"
+                 onchange="if (this.files[0] && this.files[0].size > {{ config.MAX_CONTENT_LENGTH }}) { BICTDA.toast('File too large. The limit is {{ config.MAX_UPLOAD_MB }} MB.', 'error'); this.value = ''; }"
+                 class="block w-full rounded-xl border border-slate-200 p-2 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-royal-50 file:px-3 file:py-2 file:font-semibold file:text-royal-700 hover:file:bg-royal-100">
+          {% if submission and submission.has_file %}<p class="mt-1 text-xs text-slate-500">Leave empty to keep <strong>{{ submission.file_name }}</strong>. Choosing a new file replaces it.</p>{% endif %}
         </div>
         <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-royal-600 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-110">
           <i class="fa-solid fa-paper-plane"></i>{{ "Save changes" if submission else "Submit" }}
