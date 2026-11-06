@@ -131,6 +131,18 @@ def create_app(config_class=Config):
             return f"{days} day{'s' if days != 1 else ''} ago"
         return value.strftime("%d %b %Y")
 
+    # ----- Every response is marked as ours, so the service worker can tell our pages
+    #       apart from Render's "service waking up" page (see static/service-worker.js)
+    @app.after_request
+    def mark_app_response(response):
+        response.headers["X-BICTDA-App"] = "1"
+        return response
+
+    # ----- Keep-awake URL for a free uptime monitor (no database, so Neon can still sleep)
+    @app.route("/ping")
+    def ping():
+        return "ok"
+
     # ----- Health check (Render uses this to know the app is alive)
     @app.route("/healthz")
     def healthz():
