@@ -118,13 +118,13 @@ def courses():
 @intern_bp.route("/results/<int:progress_id>")
 @intern_required
 def results(progress_id=None):
-    """My Results: graded courses only. With progress_id: the printable result slip of a PASSED course."""
+    """My Results: graded courses only. With progress_id: the printable Certificate of Completion of a PASSED course."""
     graded = [p for p in current_user.ordered_progress if p.is_completed]
     if progress_id is None:
         return render_template("intern/results.html", title="My Results", graded=graded, slip=None)
     # Only this intern's own passed courses - anything else is "not found"
     slip = next((p for p in graded if p.id == progress_id and p.is_passed), None) or abort(404)
-    return render_template("intern/results.html", title=f"Result Slip - {slip.course.title}", graded=graded, slip=slip)
+    return render_template("intern/results.html", title=f"Certificate - {slip.course.title}", graded=graded, slip=slip)
 
 
 @intern_bp.route("/assignments")

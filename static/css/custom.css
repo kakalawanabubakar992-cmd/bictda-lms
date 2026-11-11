@@ -204,12 +204,61 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
-/* Result slip: when printing (or "Save as PDF") show only the slip, on one A4 page */
+/* ---------- Certificate of Completion (My Results) ----------
+   Sizes use cqw (1% of the certificate's width), so the same design scales from a
+   phone screen to a full A4 landscape page. */
+.cert-wrap { container-type: inline-size; width: 100%; max-width: 1100px; margin: 0 auto; }
+.cert, .cert *, .cert::before, .cert::after { box-sizing: border-box; }
+:where(.cert) :where(p, h2, dl, dd) { margin: 0; }          /* no browser default gaps */
+.cert {
+  position: relative; aspect-ratio: 297 / 210; overflow: hidden; color: #1f2937;
+  background: radial-gradient(circle at 50% 42%, #ffffff 55%, #eef3ff 100%);
+  border: 1.1cqw solid #1e3a8a; border-radius: .6cqw; box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
+  font-family: Georgia, "Times New Roman", serif;
+}
+.cert::before, .cert::after { content: ""; position: absolute; pointer-events: none; }
+.cert::before { inset: 1cqw; border: .3cqw solid #10b981; }                  /* emerald frame */
+.cert::after  { inset: 1.7cqw; border: .12cqw solid #c9a227; }               /* gold hairline */
+.cert-watermark { position: absolute; left: 50%; top: 54%; width: 30cqw; transform: translate(-50%, -50%); opacity: .06; }
+.cert-inner { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; align-items: center;
+              text-align: center; padding: 2.6cqw 5cqw 2.6cqw; }
+.cert-logo { height: 8.5cqw; width: auto; }
+.cert-agency { margin-top: .7cqw; font: 700 1.15cqw/1.3 "Plus Jakarta Sans", sans-serif; letter-spacing: .2cqw;
+               text-transform: uppercase; color: #1e3a8a; }
+.cert-title { margin-top: 2.2cqw; font-size: 4.2cqw; line-height: 1.1; font-weight: 800; letter-spacing: .3cqw;
+              text-transform: uppercase; color: #1e3a8a; }
+.cert-title::after { content: ""; display: block; width: 14cqw; height: .35cqw; margin: 1.1cqw auto 0;
+                     background: linear-gradient(90deg, #10b981, #c9a227, #10b981); border-radius: 1cqw; }
+.cert-lead { margin-top: 2cqw; font-size: 1.8cqw; font-style: italic; color: #4b5563; }
+.cert-name { margin-top: .6cqw; padding: 0 3cqw .4cqw; font-size: 4.6cqw; line-height: 1.15; font-weight: 700;
+             color: #0f172a; border-bottom: .15cqw solid #c9a227; }
+.cert-course { margin-top: .6cqw; font: 800 3.3cqw/1.2 "Plus Jakarta Sans", sans-serif; color: #047857; }
+.cert-dates { margin-top: 1.3cqw; font-size: 2.1cqw; font-weight: 700; color: #1f2937; }
+.cert-note { margin-top: .5cqw; font: 1.15cqw/1.4 "Plus Jakarta Sans", sans-serif; color: #6b7280; }
+.cert-foot { margin-top: auto; width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 2cqw; }
+.cert-meta { display: grid; gap: .25cqw; text-align: left; font: 1.1cqw/1.4 "Plus Jakarta Sans", sans-serif; color: #374151; }
+.cert-meta div { display: flex; gap: .8cqw; }
+.cert-meta dt { min-width: 10cqw; font-weight: 700; text-transform: uppercase; letter-spacing: .08cqw; color: #6b7280; }
+.cert-seal { width: 8.5cqw; height: 8.5cqw; border-radius: 50%; display: flex; flex-direction: column; align-items: center;
+             justify-content: center; gap: .2cqw; color: #fff; font: 800 1.05cqw/1.1 "Plus Jakarta Sans", sans-serif;
+             letter-spacing: .1cqw; text-transform: uppercase; background: radial-gradient(circle, #10b981, #047857);
+             border: .35cqw double #fff; box-shadow: 0 0 0 .3cqw #047857; }
+.cert-seal i { font-size: 2.2cqw; color: #fde68a; }
+.cert-sign { justify-self: end; min-width: 27cqw; text-align: center; font-family: "Plus Jakarta Sans", sans-serif; }
+.cert-signed { padding-bottom: .3cqw; border-bottom: .15cqw solid #1f2937; font: italic 700 2.4cqw/1.2 "Segoe Script",
+               "Brush Script MT", "Lucida Handwriting", cursive; color: #1e3a8a; }
+.cert-signer { margin-top: .5cqw; font-size: 1.2cqw; font-weight: 700; color: #111827; }
+.cert-role { font-size: 1.1cqw; color: #4b5563; }
+
+/* Printing a certificate (or "Save as PDF"): only the certificate, on one A4 landscape page.
+   Other pages print normally. */
+@page certificate { size: A4 landscape; margin: 0; }
 @media print {
-  @page { size: A4; margin: 12mm; }
-  body { background: #fff !important; }
-  body *:not(.print-area):not(.print-area *):not(:has(.print-area)) { display: none !important; }
+  body:has(.print-area) { page: certificate; background: #fff !important; }
+  body:has(.print-area) *:not(.print-area):not(.print-area *):not(:has(.print-area)) { display: none !important; }
   body *:has(.print-area) { background: none !important; margin: 0 !important; padding: 0 !important; }
-  .print-area { position: absolute; inset: 0 0 auto 0; box-shadow: none !important; }
+  .print-area { position: absolute; inset: 0 0 auto 0; }
   .print-area, .print-area * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cert-wrap { max-width: none; width: 297mm; }
+  .cert { width: 297mm; height: 209mm; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
 }

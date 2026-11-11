@@ -8,7 +8,7 @@ What happens here:
   1. Create the Flask app and load settings from config.py
   2. Connect the extensions (database, login manager, CSRF protection)
   3. Register the page groups (blueprints): auth, intern, facilitator
-  4. Create the database tables and seed demo data if the database is empty
+  4. Create the database tables and the reference data (programmes, courses, Facilitator IDs)
   5. Error pages, health check, notifications and template helpers
 """
 import json
@@ -31,9 +31,6 @@ from utils import now_wat, today_wat
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    app.config.setdefault(
-        "SHOW_DEMO_LOGINS", os.environ.get("SHOW_DEMO_LOGINS", "true").lower() == "true"
-    )
 
     # Render sits behind a proxy: trust its headers so HTTPS links are generated correctly
     if app.config["IS_PRODUCTION"]:
@@ -69,7 +66,7 @@ def create_app(config_class=Config):
     app.register_blueprint(intern_bp)
     app.register_blueprint(facilitator_bp)
 
-    # ----- Database tables + demo data
+    # ----- Database tables + reference data (programmes, courses, issued Facilitator IDs)
     with app.app_context():
         db.create_all()
         # Databases made before file uploads existed: add the new columns and keep all existing data
@@ -80,11 +77,9 @@ def create_app(config_class=Config):
             for name, sql_type in upload_columns.items():
                 if name not in columns:
                     connection.execute(text(f"ALTER TABLE submissions ADD COLUMN {name} {sql_type}"))
-        from seed import seed_database, seed_reference_data
+        from seed import seed_reference_data
         try:
             seed_reference_data()      # programmes, courses + any Facilitator IDs added to seed.py
-            if app.config["AUTO_SEED"]:
-                seed_database(verbose=True)    # demo interns and facilitators (only into an empty database)
         except IntegrityError:
             # Another server process seeded at the same moment - safe to ignore
             db.session.rollback()
@@ -103,7 +98,6 @@ def create_app(config_class=Config):
             "today": today_wat(),
             "current_year": now_wat().year,
             "home_url": home_url_for(current_user),
-            "show_demo_logins": app.config["SHOW_DEMO_LOGINS"],
             "pass_mark": PASS_MARK,
         }
 

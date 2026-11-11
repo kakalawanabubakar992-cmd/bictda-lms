@@ -1,7 +1,7 @@
 /* =========================================================================
    BICTDA LMS - shared JavaScript
    Sidebar drawer & collapse, dropdowns, toasts, password toggle,
-   intern sign-in tabs and demo-account quick fill.
+   intern sign-in tabs.
    ========================================================================= */
 (function () {
   "use strict";
@@ -168,22 +168,6 @@
       selectLoginTab(tab);
       var input = document.getElementById("identifier");
       if (input) { input.value = ""; input.focus(); }
-    });
-  });
-
-  /* ---------- Demo account quick fill ---------- */
-  document.querySelectorAll("[data-demo-fill]").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var method = btn.getAttribute("data-method");
-      if (method) {
-        var tab = document.querySelector('[data-login-tab="' + method + '"]');
-        if (tab) selectLoginTab(tab);
-      }
-      var identifier = document.getElementById("identifier");
-      var password = document.getElementById("password");
-      if (identifier) identifier.value = btn.getAttribute("data-id");
-      if (password) password.value = btn.getAttribute("data-password");
-      showToast("Demo account filled - press Sign In.", "info");
     });
   });
 

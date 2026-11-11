@@ -47,7 +47,7 @@
             </p>
             <p class="mt-1 text-sm text-slate-600">Course attendance: <strong>{{ p.live_attendance_rate }}%</strong> ({{ p.attendance_label }})</p>
             {% if p.is_passed %}
-              <a href="{{ url_for('intern.results', progress_id=p.id) }}" class="mt-2 inline-block text-sm font-semibold text-royal-600 hover:underline"><i class="fa-solid fa-award mr-1"></i>View result slip</a>
+              <a href="{{ url_for('intern.results', progress_id=p.id) }}" class="mt-2 inline-block text-sm font-semibold text-royal-600 hover:underline"><i class="fa-solid fa-award mr-1"></i>View certificate</a>
             {% endif %}
           {% elif loop.index0 > 0 %}
             <p class="mt-3 text-xs text-slate-500"><i class="fa-solid fa-lock mr-1"></i>Unlocks when you pass {{ track[loop.index0 - 1].course.title }}.</p>

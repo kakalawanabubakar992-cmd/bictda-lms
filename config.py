@@ -59,8 +59,13 @@ class Config:
         # Neon's pooled connection (PgBouncer) - turn off psycopg's automatic prepared statements
         SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = {"prepare_threshold": None}
 
-    # Seed demo data automatically when the database is empty
-    AUTO_SEED = os.environ.get("AUTO_SEED", "true").lower() == "true"
+    # Password-reset emails. Render's free plan blocks normal email (SMTP), so emails go
+    # through Brevo's web API (free: 300 emails a day). Without a key, on your laptop the
+    # reset link is printed in the terminal instead.
+    BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+    MAIL_SENDER_EMAIL = os.environ.get("MAIL_SENDER_EMAIL", "")   # the sender address you verified in Brevo
+    MAIL_SENDER_NAME = "BICTDA LMS"
+    RESET_LINK_MINUTES = 60                                         # a reset link works for 1 hour, once
 
     # Security (CSRF + cookies)
     WTF_CSRF_TIME_LIMIT = None             # CSRF token valid for the whole session

@@ -10,12 +10,17 @@ are easy to test and to explain in the project report:
     4. post_assignment() / submit_assignment() / grade_submission()
     5. ID generators                - BICTDA-SIWES-001, BICTDA-NYSC-001, BICTDA-FAC-001
     6. register_intern() / register_facilitator() - sign-up rules for both roles
+    7. Forgot password                - signed, one-time reset links sent by email
 """
+import json
 import mimetypes
 import re
+import urllib.request
 from datetime import datetime, time, timedelta
 
 from flask import current_app
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from markupsafe import escape
 from sqlalchemy import func
 from werkzeug.utils import secure_filename
 
@@ -508,6 +513,16 @@ def create_notification(user, message, link=None, icon="fa-solid fa-bell", commi
 # ===========================================================================
 # 6. SIGN-UP (passwords are always hashed by User.set_password)
 # ===========================================================================
+def _clean_email(email):
+    """Lower-case the email, check its format and that no other account uses it."""
+    email = (email or "").strip().lower()
+    if len(email) > 120 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        raise ValueError("Please enter a valid email address.")
+    if User.query.filter(func.lower(User.email) == email).first():
+        raise ValueError("This email is already registered. Please sign in.")
+    return email
+
+
 def _check_password(password, confirm):
     if len(password or "") < MIN_PASSWORD_LENGTH:
         raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
@@ -533,21 +548,17 @@ def register_intern(full_name, email, phone, programme_code, password, confirm, 
     Email and phone must be unique. The intern gets a BICTDA Intern ID and Course 1 starts today.
     """
     full_name = " ".join((full_name or "").split())
-    email = (email or "").strip().lower()
     phone = normalize_phone(phone)
     programme = Programme.query.filter_by(code=(programme_code or "").upper()).first()
 
     if not 3 <= len(full_name) <= 120:
         raise ValueError("Please enter your full name (up to 120 characters).")
-    if len(email) > 120 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-        raise ValueError("Please enter a valid email address.")
+    email = _clean_email(email)
     if not phone:
         raise ValueError("Please enter a valid Nigerian phone number, e.g. 0803 123 4567.")
     if programme is None:
         raise ValueError("Please choose your programme: SIWES or NYSC.")
     _check_password(password, confirm)
-    if User.query.filter(func.lower(User.email) == email).first():
-        raise ValueError("This email is already registered. Please sign in.")
     if User.query.filter_by(phone=phone).first():
         raise ValueError("This phone number is already registered.")
 
@@ -565,10 +576,11 @@ def register_intern(full_name, email, phone, programme_code, password, confirm, 
     return intern
 
 
-def register_facilitator(facilitator_id, password, confirm, course_ids, commit=True):
+def register_facilitator(facilitator_id, email, password, confirm, course_ids, commit=True):
     """
-    Facilitator sign-up: a BICTDA-issued Facilitator ID + password + the courses they offer.
+    Facilitator sign-up: a BICTDA-issued Facilitator ID + email + password + the courses they offer.
     The ID must be in issued_facilitator_ids and must not have an account yet.
+    The email is used for "Forgot password" links.
     """
     facilitator_id = (facilitator_id or "").strip().upper()
     issued = IssuedFacilitatorID.query.filter(
@@ -577,9 +589,10 @@ def register_facilitator(facilitator_id, password, confirm, course_ids, commit=T
         raise ValueError("This Facilitator ID was not issued by BICTDA. Please check it or contact the admin.")
     if User.query.filter(func.upper(User.facilitator_id) == facilitator_id).first():
         raise ValueError("An account already exists for this Facilitator ID. Please sign in.")
+    email = _clean_email(email)
     _check_password(password, confirm)
 
-    facilitator = User(role=ROLE_FACILITATOR, facilitator_id=issued.facilitator_id,
+    facilitator = User(role=ROLE_FACILITATOR, facilitator_id=issued.facilitator_id, email=email,
                        full_name=issued.full_name or issued.facilitator_id)
     facilitator.set_password(password)
     set_facilitator_courses(facilitator, course_ids, commit=False)   # raises if no course chosen
@@ -587,3 +600,85 @@ def register_facilitator(facilitator_id, password, confirm, course_ids, commit=T
     if commit:
         db.session.commit()
     return facilitator
+
+
+# ===========================================================================
+# 7. FORGOT PASSWORD (signed, one-time links that expire; emails sent with Brevo)
+# ===========================================================================
+def _reset_serializer():
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="password-reset")
+
+
+def make_reset_token(user):
+    """The token holds the user id and the end of the current password hash,
+    so the link stops working as soon as the password is changed (one-time use)."""
+    return _reset_serializer().dumps({"id": user.id, "pw": user.password_hash[-16:]})
+
+
+def user_from_reset_token(token):
+    """Return the user for a valid, unexpired, unused token - otherwise None."""
+    try:
+        data = _reset_serializer().loads(token, max_age=current_app.config["RESET_LINK_MINUTES"] * 60)
+    except (BadSignature, SignatureExpired):
+        return None
+    user = db.session.get(User, data.get("id"))
+    if user is None or user.password_hash[-16:] != data.get("pw"):
+        return None
+    return user
+
+
+def reset_password(user, password, confirm):
+    _check_password(password, confirm)
+    user.set_password(password)
+    db.session.commit()
+
+
+def send_email(to_email, to_name, subject, html):
+    """
+    Send one email through Brevo's web API (Render's free plan blocks SMTP).
+    Returns True if it was sent. With no BREVO_API_KEY (your laptop), nothing is sent: the
+    email is printed in the terminal instead so you can still test the flow.
+    """
+    config = current_app.config
+    if not config["BREVO_API_KEY"] or not config["MAIL_SENDER_EMAIL"]:
+        if config["IS_PRODUCTION"]:
+            current_app.logger.error("Email not sent: BREVO_API_KEY / MAIL_SENDER_EMAIL are not set on Render.")
+            return False
+        print(f"\n[email - not sent, no BREVO_API_KEY] To: {to_email}\nSubject: {subject}\n{html}\n")
+        return True
+
+    body = json.dumps({
+        "sender": {"name": config["MAIL_SENDER_NAME"], "email": config["MAIL_SENDER_EMAIL"]},
+        "to": [{"email": to_email, "name": to_name}],
+        "subject": subject,
+        "htmlContent": html,
+    }).encode()
+    request = urllib.request.Request("https://api.brevo.com/v3/smtp/email", data=body, method="POST", headers={
+        "api-key": config["BREVO_API_KEY"], "Content-Type": "application/json", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return 200 <= response.status < 300
+    except Exception as error:                     # network problem or Brevo refused the email
+        current_app.logger.error("Brevo email failed: %s", error)
+        return False
+
+
+def send_password_reset_email(user, reset_link, logo_url):
+    """The reset email: BICTDA logo, a button and the plain link (for email apps that hide buttons)."""
+    minutes = current_app.config["RESET_LINK_MINUTES"]
+    name, link = escape(user.full_name.split()[0]), escape(reset_link)
+    login_id = escape(user.login_id)
+    html = f"""<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;color:#1f2937">
+  <div style="text-align:center"><img src="{escape(logo_url)}" alt="BICTDA" height="64"></div>
+  <h2 style="color:#1e3a8a;text-align:center">Reset your BICTDA LMS password</h2>
+  <p>Hello {name},</p>
+  <p>We received a request to reset the password for your BICTDA LMS account (<b>{login_id}</b>).
+     Click the button below to choose a new password. The link works once and expires in {minutes} minutes.</p>
+  <p style="text-align:center;margin:28px 0">
+    <a href="{link}" style="background:#1e40af;color:#ffffff;padding:13px 26px;border-radius:10px;text-decoration:none;font-weight:bold">Reset my password</a></p>
+  <p style="font-size:13px;color:#6b7280">If the button does not work, copy this link into your browser:<br>
+     <a href="{link}" style="color:#1e40af;word-break:break-all">{link}</a></p>
+  <p style="font-size:13px;color:#6b7280">If you did not ask for this, ignore this email - your password will not change.</p>
+  <p style="font-size:12px;color:#9ca3af;text-align:center;margin-top:28px">Borno State ICT Development Agency &middot; BICTDA LMS</p>
+</div>"""
+    return send_email(user.email, user.full_name, "Reset your BICTDA LMS password", html)

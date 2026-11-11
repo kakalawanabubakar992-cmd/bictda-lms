@@ -5,18 +5,21 @@ auth.py - Landing portal, Intern Sign In, Facilitator Sign In and Logout.
     /login/intern          Intern Sign In  (Email | Intern ID | Phone Number + Password)
     /login/facilitator     Facilitator Sign In (Facilitator ID + Password)
     /register/intern       Intern Sign Up (full name, email, phone, programme, password)
-    /register/facilitator  Facilitator Sign Up (BICTDA-issued ID, password, courses offered)
+    /register/facilitator  Facilitator Sign Up (BICTDA-issued ID, email, password, courses offered)
+    /forgot-password/<portal>  Ask for a password-reset link by email
+    /reset-password/<token>    Choose a new password from the emailed link (1 hour, one use)
     /logout                Sign out (POST only, protected by CSRF)
 """
 from urllib.parse import urlsplit
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 
 from decorators import home_url_for
 from models import ENROLL_SUSPENDED, ROLE_FACILITATOR, ROLE_INTERN, Course, Programme, User
-from services import register_facilitator, register_intern
+from services import (make_reset_token, register_facilitator, register_intern, reset_password,
+                      send_password_reset_email, user_from_reset_token)
 from utils import normalize_phone
 
 auth_bp = Blueprint("auth", __name__)
@@ -30,6 +33,10 @@ INTERN_METHODS = {
 
 # Same message for every failure, so we never reveal which field was wrong
 GENERIC_ERROR = "Invalid sign-in details. Please check them and try again."
+# Same message whether or not the account exists, so nobody can test which accounts exist
+RESET_SENT = ("If an account matches those details, a password reset link has been sent to its email address. "
+              "Check your inbox and spam folder - the link works for 1 hour. "
+              "No email on your account? Please contact the BICTDA admin.")
 
 
 # ---------------------------------------------------------------------------
@@ -74,24 +81,20 @@ def find_facilitator(identifier):
     ).first()
 
 
-def demo_accounts():
-    """Demo login list shown on the sign-in page (can be switched off with SHOW_DEMO_LOGINS=false)."""
-    if not current_app.config.get("SHOW_DEMO_LOGINS"):
-        return {"interns": [], "facilitators": [], "intern_password": "", "facilitator_password": ""}
-    from seed import FACILITATOR_PASSWORD, INTERN_PASSWORD
-    interns = User.query.filter_by(role=ROLE_INTERN).order_by(User.id).limit(6).all()
-    facilitators = User.query.filter_by(role=ROLE_FACILITATOR).order_by(User.id).limit(3).all()
-    return {
-        "interns": interns,
-        "facilitators": facilitators,
-        "intern_password": INTERN_PASSWORD,
-        "facilitator_password": FACILITATOR_PASSWORD,
-    }
+def find_account(portal, identifier):
+    """Forgot password: interns by email, Intern ID or phone; facilitators by Facilitator ID or email."""
+    if portal == "intern":
+        return next((user for method in INTERN_METHODS if (user := find_intern(method, identifier))), None)
+    user = find_facilitator(identifier)
+    if user is None and "@" in (identifier or ""):
+        user = User.query.filter(User.role == ROLE_FACILITATOR,
+                                 func.lower(User.email) == identifier.strip().lower()).first()
+    return user
 
 
-def _portal_page(portal, mode="signin", method="email", identifier=""):
-    """Render login.html for one portal (intern/facilitator) in sign-in or sign-up mode."""
-    titles = {"signin": "Sign In", "signup": "Sign Up"}
+def _portal_page(portal, mode="signin", method="email", identifier="", token=None, account=None):
+    """Render login.html for one portal (intern/facilitator): sign in, sign up, forgot or reset password."""
+    titles = {"signin": "Sign In", "signup": "Sign Up", "forgot": "Forgot Password", "reset": "New Password"}
     return render_template(
         "login.html",
         title=f"{portal.title()} {titles[mode]}",
@@ -103,7 +106,8 @@ def _portal_page(portal, mode="signin", method="email", identifier=""):
         form=request.form,
         programmes=Programme.query.order_by(Programme.id).all(),
         courses=Course.query.order_by(Course.sequence_order).all(),
-        demo=demo_accounts(),
+        token=token,
+        account=account,
     )
 
 
@@ -204,7 +208,7 @@ def register_facilitator_page():
     if request.method == "POST":
         form = request.form
         try:
-            facilitator = register_facilitator(form.get("facilitator_id"), form.get("password"),
+            facilitator = register_facilitator(form.get("facilitator_id"), form.get("email"), form.get("password"),
                                                form.get("confirm_password"), form.getlist("courses"))
             login_user(facilitator)
             flash(f"Welcome, {facilitator.full_name}! Your facilitator account is ready.", "success")
@@ -212,6 +216,45 @@ def register_facilitator_page():
         except ValueError as error:
             flash(str(error), "error")
     return _portal_page("facilitator", mode="signup")
+
+
+@auth_bp.route("/forgot-password/<portal>", methods=["GET", "POST"])
+def forgot_password(portal):
+    """Step 1: the user enters their email or ID; we email a reset link if the account exists."""
+    if portal not in ("intern", "facilitator"):
+        abort(404)
+    if current_user.is_authenticated:
+        return redirect(home_url_for(current_user))
+    if request.method == "POST":
+        user = find_account(portal, request.form.get("identifier"))
+        if user and user.email:
+            link = url_for("auth.reset_password_page", token=make_reset_token(user), _external=True)
+            logo = url_for("static", filename="icons/bictda-logo.png", _external=True)
+            if not send_password_reset_email(user, link, logo):
+                flash("We could not send the email right now. Please try again later or contact the BICTDA admin.", "error")
+                return _portal_page(portal, mode="forgot", identifier=request.form.get("identifier", ""))
+        flash(RESET_SENT, "info")
+        return redirect(url_for(f"auth.login_{portal}"))
+    return _portal_page(portal, mode="forgot")
+
+
+@auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password_page(token):
+    """Step 2: from the emailed link, choose a new password, then sign in with it."""
+    user = user_from_reset_token(token)
+    if user is None:
+        flash("This reset link is invalid, has expired or was already used. Please ask for a new one.", "error")
+        return redirect(url_for("auth.forgot_password", portal="intern"))
+    portal = "intern" if user.is_intern else "facilitator"
+    if request.method == "POST":
+        try:
+            reset_password(user, request.form.get("password"), request.form.get("confirm_password"))
+            logout_user()
+            flash("Your password has been changed. Please sign in with your new password.", "success")
+            return redirect(url_for(f"auth.login_{portal}"))
+        except ValueError as error:
+            flash(str(error), "error")
+    return _portal_page(portal, mode="reset", token=token, account=user)
 
 
 @auth_bp.route("/logout", methods=["POST"])

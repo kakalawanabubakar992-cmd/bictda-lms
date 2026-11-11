@@ -21,7 +21,7 @@ services:
         generateValue: true      # Render creates a long random secret for you
       - key: DATABASE_URL
         sync: false              # you paste the Neon connection string when you create the Blueprint
-      - key: AUTO_SEED
-        value: "true"            # demo accounts for your defence; set to "false" for real use
-      - key: SHOW_DEMO_LOGINS
-        value: "true"            # demo accounts box on the sign-in page; "false" for real use
+      - key: BREVO_API_KEY
+        sync: false              # Brevo API key for password-reset emails (paste it in Render)
+      - key: MAIL_SENDER_EMAIL
+        sync: false              # the sender email address you verified in Brevo
