@@ -175,7 +175,8 @@ class User(UserMixin, db.Model):
 
     @property
     def initials(self):
-        parts = [p for p in self.full_name.replace(".", " ").split() if p]
+        titles = {"engr", "dr", "mr", "mrs", "ms", "prof"}   # "Engr. Gana Yasir" -> GY, not EY
+        parts = [p for p in self.full_name.replace(".", " ").split() if p.lower() not in titles]
         if not parts:
             return "?"
         if len(parts) == 1:
