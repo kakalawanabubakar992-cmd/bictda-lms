@@ -12,7 +12,7 @@ auth.py - Landing portal, Intern Sign In, Facilitator Sign In and Logout.
 """
 from urllib.parse import urlsplit
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 
@@ -260,7 +260,6 @@ def reset_password_page(token):
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
-    logout_user()
-    session.clear()
+    logout_user()   # also deletes the "Remember me" cookie - do not call session.clear() after it
     flash("You have signed out successfully.", "info")
     return redirect(url_for("auth.index"))
