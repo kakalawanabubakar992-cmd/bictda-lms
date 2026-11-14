@@ -26,9 +26,12 @@ from werkzeug.utils import secure_filename
 
 from extensions import db
 from models import (
+    ATT_NO_CLASS,
     ATTENDANCE_CREDITS,
     ENROLL_ACTIVE,
     ENROLL_COMPLETED,
+    ENROLL_PENDING,
+    ENROLL_SUSPENDED,
     PASS_MARK,
     ROLE_FACILITATOR,
     ROLE_INTERN,
@@ -65,22 +68,42 @@ def calculate_attendance_rate(intern_id, course_id):
     Example: 4 days marked -> Punctual, Punctual, Late, Absent
              (100 + 100 + 50 + 0) / 4 = 62.5%
 
-    Returns 0.0 when no days have been marked yet.
+    "No training" days are not counted. Returns None when no days have been marked yet,
+    so the pages show "No records" instead of a misleading 0%.
     """
     total_credit, days_marked = (
         db.session.query(func.coalesce(func.sum(Attendance.credit), 0), func.count(Attendance.id))
-        .filter(Attendance.intern_id == intern_id, Attendance.course_id == course_id)
+        .filter(Attendance.intern_id == intern_id, Attendance.course_id == course_id,
+                Attendance.status != ATT_NO_CLASS)
         .one()
     )
     if not days_marked:
-        return 0.0
+        return None
     return round(float(total_credit) / days_marked, 1)
+
+
+def pending_attendance_days(progress):
+    """
+    Training days (Monday to Friday) since the intern started this course that still have no record.
+    A day is cleared when the facilitator marks the intern or records "No training" for it.
+    Today is not pending yet - it becomes pending tomorrow if nothing is recorded.
+    """
+    if progress is None or progress.is_locked or progress.is_passed or not progress.start_date:
+        return []
+    recorded = {date for (date,) in db.session.query(Attendance.date).filter_by(
+        intern_id=progress.intern_id, course_id=progress.course_id)}
+    day, today, pending = progress.start_date, today_wat(), []
+    while day < today:
+        if day.weekday() < 5 and day not in recorded:      # 0-4 = Monday-Friday
+            pending.append(day)
+        day += timedelta(days=1)
+    return pending
 
 
 def attendance_label(rate):
     """Human-friendly label for an attendance percentage."""
     if rate is None:
-        return "No Records"
+        return "Not marked yet"
     if rate >= 100:
         return "Perfect Attendance"
     if rate >= 75:
@@ -97,6 +120,7 @@ def attendance_trend(intern_id, course_id):
     """
     records = (
         Attendance.query.filter_by(intern_id=intern_id, course_id=course_id)
+        .filter(Attendance.status != ATT_NO_CLASS)
         .order_by(Attendance.date)
         .all()
     )
@@ -145,8 +169,8 @@ def mark_attendance(intern, course, on_date, status, marked_by=None, commit=True
     Marking the same day again UPDATES the record instead of duplicating it.
     """
     status = (status or "").upper()
-    if status not in ATTENDANCE_CREDITS:
-        raise ValueError("Attendance status must be PUNCTUAL, LATE or ABSENT.")
+    if status not in ATTENDANCE_CREDITS and status != ATT_NO_CLASS:
+        raise ValueError("Attendance status must be PUNCTUAL, LATE, ABSENT or NO_CLASS.")
 
     record = Attendance.query.filter_by(
         intern_id=intern.id, course_id=course.id, date=on_date
@@ -156,7 +180,7 @@ def mark_attendance(intern, course, on_date, status, marked_by=None, commit=True
         db.session.add(record)
 
     record.status = status
-    record.credit = ATTENDANCE_CREDITS[status]
+    record.credit = ATTENDANCE_CREDITS.get(status, 0)     # "No training" carries no credit and is not counted
     record.marked_by_id = marked_by.id if marked_by else None
     record.marked_at = now_wat()
 
@@ -249,6 +273,11 @@ def record_final_result(progress, score, graded_by=None, effective_date=None, co
         raise ValueError("The final score must be a number between 0 and 100.")
     if not 0 <= score <= 100:
         raise ValueError("The final score must be between 0 and 100.")
+    pending = pending_attendance_days(progress)
+    if pending:
+        raise ValueError(f"Attendance is not complete: {len(pending)} training day(s) are not yet marked "
+                         f"(first: {pending[0]:%d %b %Y}). Mark them, or record 'No training', "
+                         "before recording the final result.")
 
     intern = progress.intern
     course = progress.course
@@ -545,7 +574,8 @@ def set_facilitator_courses(facilitator, course_ids, commit=True):
 def register_intern(full_name, email, phone, programme_code, password, confirm, commit=True):
     """
     Intern sign-up: full name, email, phone, programme (SIWES/NYSC) and password.
-    Email and phone must be unique. The intern gets a BICTDA Intern ID and Course 1 starts today.
+    Email and phone must be unique. The intern gets a BICTDA Intern ID, but the account stays
+    "Pending" until a facilitator of the first course approves it (see approve_intern).
     """
     full_name = " ".join((full_name or "").split())
     phone = normalize_phone(phone)
@@ -563,14 +593,33 @@ def register_intern(full_name, email, phone, programme_code, password, confirm, 
         raise ValueError("This phone number is already registered.")
 
     intern = User(role=ROLE_INTERN, full_name=full_name, email=email, phone=phone, programme=programme,
-                  intern_id=generate_intern_id(programme.code), enrollment_date=today_wat())
+                  intern_id=generate_intern_id(programme.code), enrollment_status=ENROLL_PENDING)
     intern.set_password(password)
     db.session.add(intern)
     db.session.flush()
-    enroll_intern(intern, commit=False)
+    first_course = Course.query.order_by(Course.sequence_order).first()
+    for facilitator in (first_course.facilitators if first_course else []):
+        create_notification(facilitator, f"New intern waiting for approval: {full_name} ({intern.intern_id}).",
+                            link="/facilitator/interns", icon="fa-solid fa-user-clock", commit=False)
     create_notification(intern, f"Welcome to the BICTDA {programme.code} Internship Portal, "
                                 f"{full_name.split()[0]}! Your Intern ID is {intern.intern_id}.",
                         icon="fa-solid fa-hand-sparkles", commit=False)
+    if commit:
+        db.session.commit()
+    return intern
+
+
+def approve_intern(intern, approved, commit=True):
+    """
+    A facilitator confirms (or declines) a new intern account.
+    Approved -> the intern is enrolled and Course 1 starts today. Declined -> the account is suspended.
+    """
+    if intern.enrollment_status != ENROLL_PENDING:
+        raise ValueError("This account is not waiting for approval.")
+    if approved:
+        enroll_intern(intern, start_date=today_wat(), commit=False)
+    else:
+        intern.enrollment_status = ENROLL_SUSPENDED
     if commit:
         db.session.commit()
     return intern

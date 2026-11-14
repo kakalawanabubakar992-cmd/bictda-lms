@@ -39,13 +39,13 @@
           {% if p.is_active %}
             <div class="mt-4">{{ progress_bar(p.time_progress_percent, "royal") }}</div>
             <p class="mt-1 text-xs text-slate-500">Started {{ p.start_date|date }} &middot; Week {{ p.week_number }} of {{ p.duration_weeks }} &middot; expected finish {{ p.end_date|date }}</p>
-            <p class="mt-2 text-sm text-slate-600">Attendance so far: <strong>{{ p.live_attendance_rate }}%</strong> ({{ p.attendance_label }})</p>
+            <p class="mt-2 text-sm text-slate-600">Attendance so far: <strong>{{ p.attendance_text }}</strong> ({{ p.attendance_label }})</p>
           {% elif p.is_completed %}
             <p class="mt-3 text-sm text-slate-600">
               Final score: <strong class="{{ 'text-emerald-600' if p.is_passed else 'text-amber-600' }}">{{ p.final_score|round(1) }}%</strong>
               &middot; {{ "Passed" if p.is_passed else "Below the pass mark - retake required" }}
             </p>
-            <p class="mt-1 text-sm text-slate-600">Course attendance: <strong>{{ p.live_attendance_rate }}%</strong> ({{ p.attendance_label }})</p>
+            <p class="mt-1 text-sm text-slate-600">Course attendance: <strong>{{ p.attendance_text }}</strong> ({{ p.attendance_label }})</p>
             {% if p.is_passed %}
               <a href="{{ url_for('intern.results', progress_id=p.id) }}" class="mt-2 inline-block text-sm font-semibold text-royal-600 hover:underline"><i class="fa-solid fa-award mr-1"></i>View certificate</a>
             {% endif %}

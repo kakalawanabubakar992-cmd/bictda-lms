@@ -80,7 +80,7 @@
             <h3 class="mt-1 font-bold text-slate-900">{{ p.course.title }}</h3>
             <p class="mt-1 text-sm text-slate-600">
               Final score <strong class="{{ 'text-emerald-600' if p.is_passed else 'text-amber-600' }}">{{ p.final_score|round(1) }}%</strong>
-              &middot; Attendance <strong>{{ p.live_attendance_rate }}%</strong>
+              &middot; Attendance <strong>{{ p.attendance_text }}</strong>
               {% if p.completed_at %}&middot; Graded {{ p.completed_at|date }}{% endif %}
             </p>
           </div>

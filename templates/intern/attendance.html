@@ -17,7 +17,7 @@
       <a href="{{ url_for('intern.attendance', course=p.course_id) }}"
          class="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition
                 {{ 'border-royal-500 bg-royal-600 text-white shadow' if p.id == selected.id else 'border-slate-200 bg-white text-slate-600 hover:border-slate-300' }}">
-        <i class="{{ p.course.icon }}"></i>{{ p.course.month_label }}: {{ p.course.title }}
+        <i class="{{ p.course.icon }}"></i>{{ p.course.order_label }}: {{ p.course.title }}
       </a>
     {% endfor %}
   </section>
@@ -25,7 +25,7 @@
   <!-- ============ Summary cards ============ -->
   {% set s = attendance.summary %}
   <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    {{ metric_card("fa-solid fa-chart-simple", "1-Month Attendance", attendance.rate ~ "%", attendance.label, "emerald") }}
+    {{ metric_card("fa-solid fa-chart-simple", "Course Attendance", attendance.text, attendance.label, "emerald") }}
     {{ metric_card("fa-solid fa-circle-check", "Punctual (100%)", s.PUNCTUAL, "days on time", "royal") }}
     {{ metric_card("fa-solid fa-clock", "Late (50%)", s.LATE, "days late", "amber") }}
     {{ metric_card("fa-solid fa-circle-xmark", "Absent (0%)", s.ABSENT, "days absent", "rose") }}

@@ -17,7 +17,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 
 from decorators import home_url_for
-from models import ENROLL_SUSPENDED, ROLE_FACILITATOR, ROLE_INTERN, Course, Programme, User
+from models import ENROLL_PENDING, ENROLL_SUSPENDED, ROLE_FACILITATOR, ROLE_INTERN, Course, Programme, User
 from services import (make_reset_token, register_facilitator, register_intern, reset_password,
                       send_password_reset_email, user_from_reset_token)
 from utils import normalize_phone
@@ -153,6 +153,8 @@ def login_intern():
             flash(GENERIC_ERROR, "error")
         elif user.enrollment_status == ENROLL_SUSPENDED:
             flash("Your internship account is suspended. Please contact BICTDA.", "warning")
+        elif user.enrollment_status == ENROLL_PENDING:
+            flash("Your account is waiting for approval by a BICTDA facilitator. Please try again later.", "info")
         else:
             login_user(user, remember=remember)
             flash(f"Welcome back, {user.full_name.split()[0]}!", "success")
@@ -193,9 +195,9 @@ def register_intern_page():
         try:
             intern = register_intern(form.get("full_name"), form.get("email"), form.get("phone"),
                                      form.get("programme"), form.get("password"), form.get("confirm_password"))
-            login_user(intern)
-            flash(f"Welcome, {intern.full_name.split()[0]}! Your BICTDA Intern ID is {intern.intern_id}.", "success")
-            return redirect(url_for("intern.dashboard"))
+            flash(f"Account created. Your BICTDA Intern ID is {intern.intern_id}. "
+                  "You can sign in after a BICTDA facilitator approves your account.", "success")
+            return redirect(url_for("auth.login_intern"))
         except ValueError as error:
             flash(str(error), "error")
     return _portal_page("intern", mode="signup")

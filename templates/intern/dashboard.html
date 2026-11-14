@@ -57,7 +57,7 @@
                    (progress.time_progress_percent if progress else 100) ~ "%",
                    ("Week " ~ progress.week_number ~ " of " ~ progress.duration_weeks) if progress else "Finished", "sky") }}
     {{ metric_card("fa-solid fa-calendar-check", "Attendance",
-                   attendance.rate ~ "%", attendance.label, "emerald") }}
+                   attendance.text, attendance.label, "emerald") }}
     {{ metric_card("fa-solid fa-file-pen", "Assignments",
                    submitted ~ " / " ~ total_assignments, "Submitted this course", "amber") }}
     {{ metric_card("fa-solid fa-star", "Average Score",

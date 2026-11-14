@@ -9,7 +9,8 @@ from flask_login import current_user
 from decorators import intern_required
 from extensions import db
 from models import COURSE_DURATION_WEEKS, Assignment, Attendance
-from services import attendance_label, attendance_summary, attendance_trend, submit_assignment
+from services import (attendance_label, attendance_summary, attendance_trend, pending_attendance_days,
+                      submit_assignment)
 from utils import now_wat
 
 intern_bp = Blueprint("intern", __name__)
@@ -23,12 +24,13 @@ def _with_submissions(course, user):
 def _attendance_data(progress):
     """Attendance figures for one course, shared by the Dashboard and Attendance pages."""
     if progress is None:
-        return {"rate": 0.0, "label": attendance_label(None), "summary": None, "labels": [], "values": []}
+        return {"text": "No records", "label": attendance_label(None), "summary": None, "labels": [], "values": []}
     labels, values = attendance_trend(progress.intern_id, progress.course_id)
-    rate = progress.live_attendance_rate
+    pending = len(pending_attendance_days(progress))
     return {
-        "rate": rate,
-        "label": attendance_label(rate) if values else attendance_label(None),
+        "text": progress.attendance_text,
+        "label": attendance_label(progress.live_attendance_rate)
+                 + (f" · {pending} training day{'s' if pending != 1 else ''} not yet marked" if pending else ""),
         "summary": attendance_summary(progress.intern_id, progress.course_id),
         "labels": labels,
         "values": values,

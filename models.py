@@ -34,6 +34,7 @@ STATUS_PASSED = "COMPLETED_PASSED"
 STATUS_FAILED = "COMPLETED_FAILED"
 
 # Enrollment status of an intern
+ENROLL_PENDING = "Pending"      # new intern waiting for a facilitator's approval
 ENROLL_ACTIVE = "Active"
 ENROLL_COMPLETED = "Completed"
 ENROLL_SUSPENDED = "Suspended"
@@ -42,6 +43,7 @@ ENROLL_SUSPENDED = "Suspended"
 ATT_PUNCTUAL = "PUNCTUAL"
 ATT_LATE = "LATE"
 ATT_ABSENT = "ABSENT"
+ATT_NO_CLASS = "NO_CLASS"       # no training held that day - not counted in the attendance rate
 ATTENDANCE_CREDITS = {
     ATT_PUNCTUAL: 100,   # on time      -> full credit
     ATT_LATE: 50,        # late arrival -> half credit (punctuality penalty)
@@ -406,6 +408,12 @@ class CourseProgress(db.Model):
         from services import attendance_label
         return attendance_label(self.live_attendance_rate)
 
+    @property
+    def attendance_text(self):
+        """'85.0%' - or 'No records' when nothing has been marked yet (never a misleading 0%)."""
+        rate = self.live_attendance_rate
+        return "No records" if rate is None else f"{rate}%"
+
     def __repr__(self):
         return f"<CourseProgress intern={self.intern_id} course={self.course_id} {self.status}>"
 
@@ -423,7 +431,7 @@ class Attendance(db.Model):
     intern_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     course_id = db.Column(db.Integer, db.ForeignKey("courses.id"), nullable=False, index=True)
     date = db.Column(db.Date, nullable=False, index=True)
-    status = db.Column(db.String(10), nullable=False)    # PUNCTUAL / LATE / ABSENT
+    status = db.Column(db.String(10), nullable=False)    # PUNCTUAL / LATE / ABSENT / NO_CLASS
     credit = db.Column(db.Integer, nullable=False)       # 100 / 50 / 0
     marked_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     marked_at = db.Column(db.DateTime, default=now_wat, onupdate=now_wat)
@@ -434,7 +442,8 @@ class Attendance(db.Model):
 
     @property
     def status_label(self):
-        return {ATT_PUNCTUAL: "Punctual", ATT_LATE: "Late", ATT_ABSENT: "Absent"}.get(self.status, self.status)
+        return {ATT_PUNCTUAL: "Punctual", ATT_LATE: "Late", ATT_ABSENT: "Absent",
+                ATT_NO_CLASS: "No training"}.get(self.status, self.status)
 
     @property
     def badge_color(self):

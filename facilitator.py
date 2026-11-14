@@ -23,8 +23,10 @@ from extensions import db
 from models import (
     ATT_ABSENT,
     ATT_LATE,
+    ATT_NO_CLASS,
     ATT_PUNCTUAL,
     ATTENDANCE_CREDITS,
+    ENROLL_PENDING,
     ROLE_INTERN,
     STATUS_ACTIVE,
     STATUS_FAILED,
@@ -39,11 +41,13 @@ from models import (
     User,
 )
 from services import (
+    approve_intern,
     can_mark_attendance,
     current_progress_for,
     get_next_progress,
     grade_submission,
     mark_attendance,
+    pending_attendance_days,
     post_assignment,
     record_final_result,
     set_facilitator_courses,
@@ -70,6 +74,12 @@ def _my_courses():
 
 def _my_course_ids():
     return [c.id for c in _my_courses()]
+
+
+def _teaches_first_course():
+    """New interns always start in the first course, so its facilitators approve new accounts."""
+    first = Course.query.order_by(Course.sequence_order).first()
+    return first is not None and first.id in _my_course_ids()
 
 
 def _selected_course(courses):
@@ -155,10 +165,11 @@ def attendance():
     rows = current_progress_for(course) if course else []
 
     if request.method == "POST":
+        no_training = bool(request.form.get("no_training"))      # the "No training this day" button
         saved, errors = 0, []
         for progress in rows:
-            status = request.form.get(f"status_{progress.intern_id}")
-            if status not in ATTENDANCE_CREDITS:
+            status = ATT_NO_CLASS if no_training else request.form.get(f"status_{progress.intern_id}")
+            if status not in ATTENDANCE_CREDITS and status != ATT_NO_CLASS:
                 continue                                   # not marked - skip
             allowed, reason = can_mark_attendance(progress, on_date)
             if not allowed:
@@ -168,7 +179,8 @@ def attendance():
             saved += 1
         db.session.commit()
         if saved:
-            flash(f"Attendance saved for {saved} intern{'s' if saved != 1 else ''} on {on_date:%d %b %Y}.", "success")
+            what = "'No training' recorded" if no_training else "Attendance saved"
+            flash(f"{what} for {saved} intern{'s' if saved != 1 else ''} on {on_date:%d %b %Y}.", "success")
         for error in errors:
             flash(error, "error")
         if not saved and not errors:
@@ -178,8 +190,10 @@ def attendance():
     marked = {}
     if course:
         marked = {a.intern_id: a.status for a in Attendance.query.filter_by(course_id=course.id, date=on_date)}
+    pending = sorted({day for progress in rows for day in pending_attendance_days(progress)})
     return render_template("facilitator/attendance.html", title="Mark Attendance", courses=courses,
-                           course=course, on_date=on_date, rows=rows, marked=marked, options=ATTENDANCE_OPTIONS)
+                           course=course, on_date=on_date, rows=rows, marked=marked, options=ATTENDANCE_OPTIONS,
+                           pending=pending, no_class=ATT_NO_CLASS)
 
 
 # ---------------------------------------------------------------------------
@@ -276,9 +290,34 @@ def interns():
             "next_course": next_progress.course if next_progress else None,
         })
 
+    pending_interns = []                              # new accounts waiting for approval
+    if _teaches_first_course():
+        pending_interns = (User.query.filter_by(role=ROLE_INTERN, enrollment_status=ENROLL_PENDING)
+                           .order_by(User.created_at).all())
+
     return render_template("facilitator/interns.html", title="Interns & Results", rows=rows,
+                           pending_interns=pending_interns,
                            programmes=Programme.query.order_by(Programme.id).all(), courses=_my_courses(),
                            filters={"programme": programme, "course": course_id, "status": status, "q": search})
+
+
+@facilitator_bp.route("/interns/<int:intern_id>/approve", methods=["POST"])
+@facilitator_required
+def approve(intern_id):
+    """Approve or decline a new intern account. Only facilitators of the first course may do this."""
+    intern = db.session.get(User, intern_id)
+    if intern is None or not intern.is_intern or not _teaches_first_course():
+        abort(404)
+    try:
+        approved = request.form.get("decision") == "approve"
+        approve_intern(intern, approved)
+        if approved:
+            flash(f"{intern.full_name} ({intern.intern_id}) is approved and can now sign in.", "success")
+        else:
+            flash(f"{intern.full_name}'s account was declined and cannot be used.", "warning")
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("facilitator.interns"))
 
 
 @facilitator_bp.route("/results/<int:progress_id>", methods=["POST"])
