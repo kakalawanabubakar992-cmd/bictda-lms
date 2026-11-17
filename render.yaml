@@ -21,6 +21,10 @@ services:
         generateValue: true      # Render creates a long random secret for you
       - key: DATABASE_URL
         sync: false              # you paste the Neon connection string when you create the Blueprint
+      - key: GOOGLE_SCRIPT_URL
+        sync: false              # Google Apps Script Web app URL for password-reset emails
+      - key: GOOGLE_SCRIPT_SECRET
+        sync: false              # the same secret you typed in the Google Apps Script
       - key: BREVO_API_KEY
         sync: false              # Brevo API key for password-reset emails (paste it in Render)
       - key: MAIL_SENDER_EMAIL
