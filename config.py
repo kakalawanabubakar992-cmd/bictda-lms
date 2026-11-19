@@ -59,13 +59,11 @@ class Config:
         # Neon's pooled connection (PgBouncer) - turn off psycopg's automatic prepared statements
         SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = {"prepare_threshold": None}
 
-    # Password-reset emails. Render's free plan blocks normal email (SMTP), so emails go over HTTPS:
-    # a Google Apps Script that sends from your Gmail (used when GOOGLE_SCRIPT_URL is set), or Brevo.
-    # With neither, on your laptop the reset link is printed in the terminal instead.
+    # Password-reset emails. Render's free plan blocks normal email (SMTP), so a Google Apps Script
+    # sends them from the BICTDA LMS Gmail account over HTTPS. Without GOOGLE_SCRIPT_URL, on your
+    # laptop the reset link is printed in the terminal instead.
     GOOGLE_SCRIPT_URL = os.environ.get("GOOGLE_SCRIPT_URL", "")         # the Web app URL ending in /exec
     GOOGLE_SCRIPT_SECRET = os.environ.get("GOOGLE_SCRIPT_SECRET", "")   # must match SECRET in the script
-    BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
-    MAIL_SENDER_EMAIL = os.environ.get("MAIL_SENDER_EMAIL", "")   # the sender address you verified in Brevo
     MAIL_SENDER_NAME = "BICTDA LMS"
     RESET_LINK_MINUTES = 60                                         # a reset link works for 1 hour, once
 

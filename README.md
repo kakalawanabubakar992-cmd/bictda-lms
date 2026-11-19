@@ -48,9 +48,17 @@ a Facilitator ID issued by BICTDA (see below).
 
 ## Forgot password
 Interns and facilitators click **Forgot password?** on the sign-in page and get an email with a reset link
-(valid for 1 hour, works once). Emails are sent with Brevo's free web API because Render's free plan blocks
-normal email (SMTP). On Render set `BREVO_API_KEY` and `MAIL_SENDER_EMAIL` (a sender address verified in Brevo).
-On your laptop, without a key, the reset email is printed in the terminal instead.
+(valid for 1 hour, works once). Render's free plan blocks normal email (SMTP), so a small Google Apps Script
+sends the emails from the BICTDA LMS Gmail account (free, 100 emails a day):
+
+1. In that Gmail account open script.google.com, create a project and paste in `BICTDA_LMS_email_script.gs`
+   (kept outside this repository). Put a long random secret in its `SECRET` line and save.
+2. Run `testSend` once and allow the permissions.
+3. Deploy > New deployment > Web app, Execute as: Me, Who has access: Anyone. Copy the Web app URL (`/exec`).
+   After any later edit: Deploy > Manage deployments > edit > New version (the URL stays the same).
+4. On Render set `GOOGLE_SCRIPT_URL` (the Web app URL) and `GOOGLE_SCRIPT_SECRET` (the same secret).
+
+On your laptop, without `GOOGLE_SCRIPT_URL`, the reset email is printed in the terminal instead.
 
 ## Install on a phone (PWA)
 The LMS is a Progressive Web App:

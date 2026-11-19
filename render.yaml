@@ -25,7 +25,3 @@ services:
         sync: false              # Google Apps Script Web app URL for password-reset emails
       - key: GOOGLE_SCRIPT_SECRET
         sync: false              # the same secret you typed in the Google Apps Script
-      - key: BREVO_API_KEY
-        sync: false              # Brevo API key for password-reset emails (paste it in Render)
-      - key: MAIL_SENDER_EMAIL
-        sync: false              # the sender email address you verified in Brevo

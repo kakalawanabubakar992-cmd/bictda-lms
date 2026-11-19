@@ -652,7 +652,7 @@ def register_facilitator(facilitator_id, email, password, confirm, course_ids, c
 
 
 # ===========================================================================
-# 7. FORGOT PASSWORD (signed, one-time links that expire; emails sent with Brevo)
+# 7. FORGOT PASSWORD (signed, one-time links that expire; emails sent with a Google Apps Script)
 # ===========================================================================
 def _reset_serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="password-reset")
@@ -682,45 +682,37 @@ def reset_password(user, password, confirm):
     db.session.commit()
 
 
-def _post_json(url, payload, headers=None):
+def _post_json(url, payload):
     """POST JSON over HTTPS and return the reply text. Raises an error if it fails."""
-    request = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers={
-        "Content-Type": "application/json", "Accept": "application/json", **(headers or {})})
+    request = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST",
+                                     headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(request, timeout=20) as response:
         return response.read().decode(errors="replace")
 
 
 def send_email(to_email, to_name, subject, html):
     """
-    Send one email over HTTPS (Render's free plan blocks normal email, SMTP). Returns True if sent.
-      1. GOOGLE_SCRIPT_URL set -> a Google Apps Script sends it from your Gmail account (free, 100 a day).
-      2. Otherwise BREVO_API_KEY set -> Brevo's web API.
-      3. Neither (your laptop) -> nothing is sent: the email is printed in the terminal so you can test.
+    Send one email through a Google Apps Script, which sends it from the BICTDA LMS Gmail account
+    (free, 100 emails a day). It goes over HTTPS because Render's free plan blocks normal email (SMTP).
+    Returns True if sent. With no GOOGLE_SCRIPT_URL on your laptop, the email is printed in the terminal.
     """
     config = current_app.config
+    if not config["GOOGLE_SCRIPT_URL"]:
+        if config["IS_PRODUCTION"]:
+            current_app.logger.error("Email not sent: GOOGLE_SCRIPT_URL is not set on Render.")
+            return False
+        print(f"\n[email - not sent, no GOOGLE_SCRIPT_URL] To: {to_email}\nSubject: {subject}\n{html}\n")
+        return True
     try:
-        if config["GOOGLE_SCRIPT_URL"]:
-            reply = _post_json(config["GOOGLE_SCRIPT_URL"], {
-                "secret": config["GOOGLE_SCRIPT_SECRET"], "to": to_email,
-                "name": config["MAIL_SENDER_NAME"], "subject": subject, "html": html})
-            if reply.strip() != "OK":
-                current_app.logger.error("Google Script email failed: %s", reply[:300])
-            return reply.strip() == "OK"
-        if config["BREVO_API_KEY"] and config["MAIL_SENDER_EMAIL"]:
-            _post_json("https://api.brevo.com/v3/smtp/email", {
-                "sender": {"name": config["MAIL_SENDER_NAME"], "email": config["MAIL_SENDER_EMAIL"]},
-                "to": [{"email": to_email, "name": to_name}], "subject": subject, "htmlContent": html,
-            }, headers={"api-key": config["BREVO_API_KEY"]})
-            return True
-    except Exception as error:                     # network problem, or the service refused the email
-        reason = error.read().decode(errors="replace")[:300] if hasattr(error, "read") else ""
-        current_app.logger.error("Email failed: %s %s", error, reason)
+        reply = _post_json(config["GOOGLE_SCRIPT_URL"], {
+            "secret": config["GOOGLE_SCRIPT_SECRET"], "to": to_email,
+            "name": config["MAIL_SENDER_NAME"], "subject": subject, "html": html})
+    except Exception as error:                     # network problem, or Google refused the request
+        current_app.logger.error("Email failed: %s", error)
         return False
-
-    if config["IS_PRODUCTION"]:
-        current_app.logger.error("Email not sent: set GOOGLE_SCRIPT_URL (or BREVO_API_KEY) on Render.")
+    if reply.strip() != "OK":                      # e.g. "ERROR: wrong secret"
+        current_app.logger.error("Google Script email failed: %s", reply[:300])
         return False
-    print(f"\n[email - not sent, no email service set] To: {to_email}\nSubject: {subject}\n{html}\n")
     return True
 
 
