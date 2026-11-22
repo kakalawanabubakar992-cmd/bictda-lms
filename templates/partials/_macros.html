@@ -85,7 +85,8 @@
     </span>
   </div>
   {# value and sub-text sit below the icon so they can use the full width of the card #}
-  <p class="relative mt-1 break-words text-2xl font-extrabold text-slate-900">{{ value }}</p>
+    {# long values such as "Web Development" use a smaller size so no word is split #}
+  <p class="relative mt-1 break-words {{ 'text-lg' if value|string|length > 10 else 'text-2xl' }} font-extrabold text-slate-900">{{ value }}</p>
   {% if sub %}<p class="relative mt-1 text-xs text-slate-500">{{ sub }}</p>{% endif %}
 </div>
 {%- endmacro %}
